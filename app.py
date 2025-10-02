@@ -45,74 +45,105 @@ aws_secret_key = None
 st.set_page_config(
     page_title="Databricks Data Chat",
     page_icon="💬",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better chat UI and sidebar (Dark theme optimized)
+# Custom CSS for better chat UI and sidebar (Sophisticated Dark Theme)
 st.markdown("""
     <style>
-    /* Main content area - Lighter dark theme */
+    /* Main content area - Sophisticated dark gray theme */
     .stApp {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        background: linear-gradient(135deg, #1a1d23 0%, #0f1115 100%);
+        background-attachment: fixed;
     }
     .main .block-container {
-        background-color: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(10px);
-        border-radius: 1rem;
-        padding: 2rem;
+        background: linear-gradient(135deg, rgba(26, 29, 35, 0.85) 0%, rgba(15, 17, 21, 0.7) 100%);
+        backdrop-filter: blur(20px);
+        border-radius: 1.25rem;
+        padding: 2.5rem;
         margin-top: 1rem;
+        border: 1px solid rgba(64, 68, 78, 0.15);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
     .stChatMessage {
-        padding: 1.25rem;
-        border-radius: 0.75rem;
+        padding: 1.5rem;
+        border-radius: 1rem;
         font-size: 1rem;
-        background-color: rgba(30, 41, 59, 0.5) !important;
-        border: 1px solid rgba(71, 85, 105, 0.3);
+        background: rgba(32, 35, 42, 0.6) !important;
+        border: 1px solid rgba(64, 68, 78, 0.25);
+        backdrop-filter: blur(10px);
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    .stChatMessage:hover {
+        border-color: rgba(96, 165, 250, 0.3);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     }
     .stChatMessage[data-testid="user"] {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%) !important;
-        border-left: 3px solid #3b82f6;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%) !important;
+        border-left: 3px solid #5b8fd4;
     }
     .stChatMessage[data-testid="assistant"] {
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%) !important;
-        border-left: 3px solid #10b981;
+        background: linear-gradient(135deg, rgba(52, 211, 153, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%) !important;
+        border-left: 3px solid #4db89d;
     }
     .main-header {
         font-size: 2.25rem;
         font-weight: 700;
         margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #e5e7eb;
+        letter-spacing: -0.01em;
     }
-    /* Sidebar styling - Darker theme with fixed width */
+    /* Sidebar styling - Rich dark theme */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
-        border-right: 1px solid rgba(71, 85, 105, 0.3);
+        background: linear-gradient(180deg, #0d0e12 0%, #08090c 100%);
+        border-right: 1px solid rgba(64, 68, 78, 0.25);
         width: 300px !important;
         min-width: 300px !important;
         max-width: 300px !important;
         padding: 1.5rem 0 !important;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.4);
     }
     [data-testid="stSidebar"] > div:first-child {
         width: 300px !important;
         padding: 0 !important;
     }
-    /* Consistent padding for all sidebar content */
-    [data-testid="stSidebar"] .element-container,
+    /* Universal sidebar content wrapper - force consistent container width */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"],
     [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    /* Consistent padding for all sidebar elements */
+    [data-testid="stSidebar"] .element-container {
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+        width: calc(100% - 2rem) !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
     }
-    /* Remove emotion cache area */
-    [data-testid="stSidebar"] .st-emotion-cache-1q82h82 {
-        display: none !important;
+    /* Button containers - full width within padding */
+    [data-testid="stSidebar"] .stButton {
+        width: 100% !important;
     }
-    [data-testid="stSidebar"] .e1wr3kle3 {
-        display: none !important;
+    [data-testid="stSidebar"] .stButton > button {
+        width: 100% !important;
+        margin: 0 !important;
     }
-    /* Hide default padding areas */
+    /* Input containers - full width within padding */
+    [data-testid="stSidebar"] .stTextInput {
+        width: 100% !important;
+    }
+    [data-testid="stSidebar"] .stTextInput > div {
+        width: 100% !important;
+    }
+    /* Remove all emotion cache dynamic classes */
+    [data-testid="stSidebar"] [class*="st-emotion-cache"] {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    /* Reset default Streamlit padding */
     [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div:first-child {
         padding-top: 0 !important;
     }
@@ -120,15 +151,18 @@ st.markdown("""
     .sidebar-header {
         font-size: 1.5rem;
         font-weight: 700;
-        color: #ffffff;
+        color: #d1d5db;
         margin-bottom: 0.5rem;
         letter-spacing: -0.02em;
         text-align: center;
         padding: 0 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .message-count {
         font-size: 0.8rem;
-        color: #9ca3af;
+        color: #6b7280;
         font-weight: 500;
         text-align: center;
         padding: 0 1rem;
@@ -144,9 +178,9 @@ st.markdown("""
     .section-title {
         font-size: 0.875rem;
         font-weight: 600;
-        color: #d1d5db;
+        color: #9ca3af;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         margin-bottom: 0.75rem;
         text-align: center;
         padding: 0 1rem;
@@ -157,43 +191,46 @@ st.markdown("""
     [data-testid="stSidebar"] h3 {
         display: none;
     }
-    /* Button styling - Dark theme optimized */
+    /* Button styling - Subtle professional theme */
     [data-testid="stSidebar"] button {
         font-size: 0.75rem;
-        font-weight: 500;
-        padding: 0.4rem 0.6rem;
-        border-radius: 0.3rem;
+        font-weight: 600;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
         white-space: nowrap;
-        background-color: #1a1a1a;
-        border: 1px solid #2d2d2d;
-        color: #d1d5db;
-        transition: all 0.15s ease;
-        box-shadow: none;
+        background: rgba(32, 35, 42, 0.6);
+        border: 1px solid rgba(64, 68, 78, 0.3);
+        color: #9ca3af;
+        transition: all 0.25s ease;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         min-height: auto;
         height: auto;
+        backdrop-filter: blur(10px);
     }
     [data-testid="stSidebar"] button:hover {
-        background-color: #252525;
-        border-color: #3b82f6;
-        color: #ffffff;
+        background: rgba(59, 130, 246, 0.12);
+        border-color: rgba(91, 143, 212, 0.4);
+        color: #d1d5db;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        transform: translateY(-1px);
     }
     [data-testid="stSidebar"] button:active {
-        background-color: #0f0f0f;
-        transform: scale(0.98);
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
     /* New Chat button specific styling */
     [data-testid="stSidebar"] button[kind="primary"],
     [data-testid="stSidebar"] button:first-of-type {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%);
-        border: 1px solid #3b82f6;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%);
+        border: 1px solid rgba(91, 143, 212, 0.35);
         color: #93c5fd;
+        font-weight: 700;
     }
     [data-testid="stSidebar"] button[kind="primary"]:hover,
     [data-testid="stSidebar"] button:first-of-type:hover {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%);
-        border-color: #60a5fa;
-        color: #bfdbfe;
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.22) 0%, rgba(37, 99, 235, 0.12) 100%);
+        border-color: rgba(91, 143, 212, 0.5);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
     }
     /* Button text container */
     [data-testid="stSidebar"] button > div {
@@ -204,41 +241,43 @@ st.markdown("""
         padding: 0 !important;
         line-height: 1.2 !important;
     }
-    /* Message preview styling - Modern card design */
+    /* Message preview styling - Subtle card design */
     .message-preview {
-        padding: 0.75rem;
+        padding: 0.875rem;
         margin: 0.5rem 1rem;
-        border-radius: 0.5rem;
-        background: linear-gradient(135deg, rgba(26, 26, 26, 0.8) 0%, rgba(15, 15, 15, 0.8) 100%);
-        border-left: 3px solid #3b82f6;
-        transition: all 0.2s ease;
+        border-radius: 0.75rem;
+        background: rgba(32, 35, 42, 0.5);
+        border: 1px solid rgba(64, 68, 78, 0.25);
+        border-left: 3px solid #5b8fd4;
+        transition: all 0.3s ease;
         word-wrap: break-word;
         overflow-wrap: break-word;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         cursor: pointer;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(12px);
     }
     .message-preview:hover {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
-        border-left-color: #60a5fa;
+        background: rgba(59, 130, 246, 0.08);
+        border-left-color: #6b9fe8;
+        border-color: rgba(91, 143, 212, 0.3);
         transform: translateX(3px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     }
     .role-badge {
         display: inline-block;
         font-size: 0.75rem;
         font-weight: 600;
-        color: #d1d5db;
+        color: #9ca3af;
         margin-bottom: 0.375rem;
     }
     .preview-text {
         font-size: 0.85rem;
         line-height: 1.4rem;
-        color: #f3f4f6;
+        color: #d1d5db;
     }
     .search-results {
         font-size: 0.75rem;
-        color: #9ca3af;
+        color: #6b7280;
         margin-bottom: 0.5rem;
         font-weight: 500;
         text-align: center;
@@ -247,7 +286,7 @@ st.markdown("""
     .empty-state {
         text-align: center;
         padding: 2rem 1rem;
-        color: #9ca3af;
+        color: #6b7280;
         font-size: 0.875rem;
         line-height: 1.5rem;
         margin: 0 1rem;
@@ -255,31 +294,33 @@ st.markdown("""
     .more-messages {
         text-align: center;
         font-size: 0.75rem;
-        color: #9ca3af;
+        color: #6b7280;
         margin: 0.75rem 1rem 0;
         padding: 0.5rem;
-        background-color: #1f2937;
-        border-radius: 0.375rem;
-    }
-    /* Input field styling - Modern design */
-    [data-testid="stSidebar"] input {
-        font-size: 0.875rem;
-        padding: 0.625rem 0.875rem;
+        background: rgba(32, 35, 42, 0.4);
+        border: 1px solid rgba(64, 68, 78, 0.2);
         border-radius: 0.5rem;
-        background-color: rgba(26, 26, 26, 0.8);
-        color: #ffffff;
-        border: 1.5px solid #2d2d2d;
-        width: 100%;
-        transition: all 0.2s ease;
         backdrop-filter: blur(10px);
     }
+    /* Input field styling - Subtle modern design */
+    [data-testid="stSidebar"] input {
+        font-size: 0.875rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        background: rgba(32, 35, 42, 0.5);
+        color: #d1d5db;
+        border: 1.5px solid rgba(64, 68, 78, 0.3);
+        width: 100%;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(12px);
+    }
     [data-testid="stSidebar"] input:focus {
-        border-color: #3b82f6;
-        background-color: rgba(30, 30, 30, 0.9);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        border-color: rgba(91, 143, 212, 0.5);
+        background: rgba(32, 35, 42, 0.7);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
     [data-testid="stSidebar"] input::placeholder {
-        color: #6b7280;
+        color: #4b5563;
         font-size: 0.85rem;
     }
     /* Caption text */
@@ -345,7 +386,7 @@ st.markdown("""
 # Sidebar
 with st.sidebar:
     # Header with title and message count
-    st.markdown('<div class="sidebar-header">💬 Databricks Chat</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header">Databricks Chat</div>', unsafe_allow_html=True)
 
     total_messages = len(st.session_state.get("messages", []))
     if total_messages > 0:
