@@ -21,6 +21,15 @@ report_helper = ReportHelper()
 # Configuration - Set your Genie Space ID here
 GENIE_SPACE_ID = st.secrets.get("GENIE_SPACE_ID", "01f09e5ad40117acb8b6b820e30a0f8e")  # Or set via Databricks secrets
 
+# Default settings (previously in sidebar)
+ai_mode = "Genie API"  # Default AI mode
+chart_type = "Auto"  # Default chart type
+llm_endpoint = None
+bedrock_model = "anthropic.claude-3-sonnet-20240229-v1:0"
+bedrock_region = "us-east-1"
+aws_access_key = None
+aws_secret_key = None
+
 # Page configuration
 st.set_page_config(
     page_title="Databricks Data Chat",
@@ -28,176 +37,333 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom CSS for better chat UI
+# Custom CSS for better chat UI and sidebar (Dark theme optimized)
 st.markdown("""
     <style>
     .stChatMessage {
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: 1.25rem;
+        border-radius: 0.75rem;
+        font-size: 1rem;
     }
     .main-header {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+    /* Sidebar styling - Dark theme with fixed width */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+        width: 300px !important;
+        min-width: 300px !important;
+        max-width: 300px !important;
+        padding: 1.5rem 1rem !important;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        width: 300px !important;
+        padding: 0 !important;
+    }
+    /* Remove emotion cache area */
+    [data-testid="stSidebar"] .st-emotion-cache-1q82h82 {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] .e1wr3kle3 {
+        display: none !important;
+    }
+    /* Hide default padding areas */
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div:first-child {
+        padding-top: 0 !important;
+    }
+    /* Custom sidebar elements */
+    .sidebar-header {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.02em;
+    }
+    .message-count {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        font-weight: 500;
+    }
+    .sidebar-spacing {
+        height: 1rem;
+    }
+    .sidebar-section-spacing {
+        height: 1.25rem;
+    }
+    .section-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #d1d5db;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.75rem;
+    }
+    [data-testid="stSidebar"] h1 {
+        display: none;
+    }
+    [data-testid="stSidebar"] h3 {
+        display: none;
+    }
+    /* Button styling - Dark theme optimized */
+    [data-testid="stSidebar"] button {
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.3rem;
+        white-space: nowrap;
+        background-color: #2d2d2d;
+        border: 1px solid #404040;
+        color: #ffffff;
+        transition: all 0.15s ease;
+        box-shadow: none;
+        min-height: auto;
+        height: auto;
+    }
+    [data-testid="stSidebar"] button:hover {
+        background-color: #3a3a3a;
+        border-color: #525252;
+        color: #ffffff;
+    }
+    [data-testid="stSidebar"] button:active {
+        background-color: #252525;
+        transform: scale(0.98);
+    }
+    /* New Chat button specific styling */
+    [data-testid="stSidebar"] button[kind="primary"],
+    [data-testid="stSidebar"] button:first-of-type {
+        background-color: #1f2937;
+        border: 1px solid #3b82f6;
+        color: #93c5fd;
+    }
+    [data-testid="stSidebar"] button[kind="primary"]:hover,
+    [data-testid="stSidebar"] button:first-of-type:hover {
+        background-color: #374151;
+        border-color: #60a5fa;
+        color: #bfdbfe;
+    }
+    /* Button text container */
+    [data-testid="stSidebar"] button > div {
+        padding: 0 !important;
+    }
+    [data-testid="stSidebar"] button p {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+    }
+    /* Message preview styling - Modern card design */
+    .message-preview {
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border-radius: 0.5rem;
+        background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+        border-left: 3px solid #3b82f6;
+        transition: all 0.2s ease;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+    }
+    .message-preview:hover {
+        background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+        border-left-color: #60a5fa;
+        transform: translateX(2px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+    .role-badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #d1d5db;
+        margin-bottom: 0.375rem;
+    }
+    .preview-text {
+        font-size: 0.85rem;
+        line-height: 1.4rem;
+        color: #f3f4f6;
+    }
+    .search-results {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 2rem 1rem;
+        color: #9ca3af;
+        font-size: 0.875rem;
+        line-height: 1.5rem;
+    }
+    .more-messages {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 0.75rem;
+        padding: 0.5rem;
+        background-color: #1f2937;
+        border-radius: 0.375rem;
+    }
+    /* Input field styling - Modern design */
+    [data-testid="stSidebar"] input {
+        font-size: 0.875rem;
+        padding: 0.625rem 0.875rem;
+        border-radius: 0.5rem;
+        background-color: #2d2d2d;
+        color: #ffffff;
+        border: 1.5px solid #404040;
+        width: 100%;
+        transition: all 0.2s ease;
+    }
+    [data-testid="stSidebar"] input:focus {
+        border-color: #3b82f6;
+        background-color: #333333;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    [data-testid="stSidebar"] input::placeholder {
+        color: #6b7280;
+        font-size: 0.85rem;
+    }
+    /* Caption text */
+    [data-testid="stSidebar"] .element-container p {
+        font-size: 0.8rem;
+        color: #d1d5db;
+        margin: 0.5rem 0;
+    }
+    /* Info message styling */
+    [data-testid="stSidebar"] [data-testid="stAlert"] {
+        background-color: #1f2937;
+        border-left: 3px solid #3b82f6;
+        border-radius: 0.375rem;
+        padding: 0.625rem;
+        font-size: 0.8rem;
+    }
+    /* Divider styling */
+    [data-testid="stSidebar"] hr {
+        display: none;
+    }
+    /* Sidebar collapse/expand button styling */
+    [data-testid="stSidebarNav"] button,
+    button[kind="header"] {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 0.5rem !important;
+        transition: all 0.15s ease !important;
+    }
+    [data-testid="stSidebarNav"] button:hover,
+    button[kind="header"]:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+    [data-testid="stSidebarNav"] button svg,
+    button[kind="header"] svg {
+        color: #9ca3af !important;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+    }
+    [data-testid="stSidebarNav"] button:hover svg,
+    button[kind="header"]:hover svg {
+        color: #ffffff !important;
+    }
+    /* Collapsed sidebar expand button */
+    [data-testid="collapsedControl"] {
+        background-color: #2d2d2d !important;
+        border: 1px solid #404040 !important;
+        border-radius: 0.5rem !important;
+        padding: 0.75rem !important;
+        transition: all 0.15s ease !important;
+    }
+    [data-testid="collapsedControl"]:hover {
+        background-color: #3a3a3a !important;
+        border-color: #525252 !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        color: #ffffff !important;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.title("⚙️ Settings")
+    # Header with title and message count
+    st.markdown('<div class="sidebar-header">💬 Databricks Chat</div>', unsafe_allow_html=True)
 
-    # AI Mode Selection
-    st.subheader("AI Mode")
-    ai_mode = st.selectbox(
-        "Select AI Backend",
-        ["Genie API", "LLM Endpoint (Databricks)", "LLM Endpoint (Bedrock)", "Mock (Demo)"],
-        help="Choose how to process queries"
-    )
+    total_messages = len(st.session_state.get("messages", []))
+    if total_messages > 0:
+        st.markdown(f'<div class="message-count">{total_messages} messages</div>', unsafe_allow_html=True)
 
-    # Genie Space ID input (if using Genie)
-    if ai_mode == "Genie API":
-        genie_space_input = st.text_input(
-            "Genie Space ID",
-            value=GENIE_SPACE_ID,
-            help="Enter your Genie Space ID"
-        )
-        if genie_space_input:
-            GENIE_SPACE_ID = genie_space_input
+    st.markdown('<div class="sidebar-spacing"></div>', unsafe_allow_html=True)
 
-    # LLM Endpoint input (if using Databricks LLM)
-    if ai_mode == "LLM Endpoint (Databricks)":
-        llm_endpoint = st.text_input(
-            "LLM Endpoint Name",
-            placeholder="chat-assistant-model",
-            help="Enter your Databricks serving endpoint name"
-        )
-
-    # Bedrock Configuration (if using Bedrock)
-    if ai_mode == "LLM Endpoint (Bedrock)":
-        st.markdown("**AWS Bedrock Configuration**")
-
-        bedrock_model = st.selectbox(
-            "Claude Model",
-            [
-                "anthropic.claude-3-sonnet-20240229-v1:0",
-                "anthropic.claude-3-opus-20240229-v1:0",
-                "anthropic.claude-3-haiku-20240307-v1:0",
-                "anthropic.claude-v2:1",
-                "anthropic.claude-v2"
-            ],
-            help="Select Claude model from AWS Bedrock"
-        )
-
-        bedrock_region = st.text_input(
-            "AWS Region",
-            value="us-east-1",
-            help="AWS region for Bedrock"
-        )
-
-        # Optional: AWS credentials (if not using environment variables)
-        with st.expander("AWS Credentials (Optional)"):
-            st.info("Leave empty to use environment variables or IAM role")
-            aws_access_key = st.text_input("AWS Access Key ID", type="password")
-            aws_secret_key = st.text_input("AWS Secret Access Key", type="password")
-
-    st.subheader("Visualization Options")
-    chart_type = st.selectbox(
-        "Default Chart Type",
-        ["Auto", "Bar", "Line", "Pie", "Scatter", "Heatmap"]
-    )
-
-    st.subheader("Export Options")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📄 Export PDF", use_container_width=True):
-            if len(st.session_state.messages) > 1:
-                try:
-                    # Build report from chat history
-                    report_helper.clear()
-                    report_helper.add_section("Chat Summary", f"Conversation with {len(st.session_state.messages)} messages", "text")
-
-                    for msg in st.session_state.messages:
-                        if msg["role"] == "assistant":
-                            report_helper.add_section(
-                                "Response",
-                                msg.get("content", ""),
-                                "text"
-                            )
-                            if "table_data" in msg and not msg["table_data"].empty:
-                                report_helper.add_dataframe("Data", msg["table_data"])
-                            if "chart_data" in msg:
-                                report_helper.add_chart("Visualization", msg["chart_data"])
-
-                    # Generate PDF
-                    pdf_bytes = report_helper.generate_pdf(
-                        title="Databricks Chat Report",
-                        author=email
-                    )
-
-                    st.download_button(
-                        label="⬇️ Download PDF",
-                        data=pdf_bytes,
-                        file_name=f"chat_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                        mime="application/pdf"
-                    )
-                except Exception as e:
-                    st.error(f"PDF generation failed: {str(e)}")
-            else:
-                st.info("Start a conversation to export reports")
-    with col2:
-        if st.button("🌐 Export HTML", use_container_width=True):
-            if len(st.session_state.messages) > 1:
-                try:
-                    # Build report from chat history
-                    report_helper.clear()
-                    report_helper.add_section("Chat Summary", f"Conversation with {len(st.session_state.messages)} messages", "text")
-
-                    for msg in st.session_state.messages:
-                        if msg["role"] == "assistant":
-                            report_helper.add_section(
-                                "Response",
-                                msg.get("content", ""),
-                                "text"
-                            )
-                            if "table_data" in msg and not msg["table_data"].empty:
-                                report_helper.add_dataframe("Data", msg["table_data"])
-                            if "chart_data" in msg:
-                                report_helper.add_chart("Visualization", msg["chart_data"])
-
-                    # Generate HTML
-                    html_content = report_helper.generate_html(
-                        title="Databricks Chat Report",
-                        author=email
-                    )
-
-                    st.download_button(
-                        label="⬇️ Download HTML",
-                        data=html_content,
-                        file_name=f"chat_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                        mime="text/html"
-                    )
-                except Exception as e:
-                    st.error(f"HTML generation failed: {str(e)}")
-            else:
-                st.info("Start a conversation to export reports")
-
-    st.divider()
-
-    st.subheader("Session Info")
-    st.text(f"Session: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-
-    # Display current user info
-    headers = st.context.headers
-    email = headers.get("X-Forwarded-Email", "Unknown")
-    st.text(f"User: {email}")
-    st.text(f"Mode: {ai_mode}")
-
-    if st.button("🗑️ Clear Chat History", use_container_width=True):
+    # New Chat Button
+    if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn"):
         st.session_state.messages = []
         if "conversation_id" in st.session_state:
             del st.session_state.conversation_id
         st.rerun()
+
+    st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
+
+    # Chat Search
+    search_query = st.text_input(
+        "Search",
+        placeholder="🔍 Search messages...",
+        label_visibility="collapsed",
+        key="search_input"
+    )
+
+    st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Recent Chats</div>', unsafe_allow_html=True)
+
+    # Chat history container
+    if search_query:
+        # Filter messages by search query
+        filtered_messages = [
+            msg for msg in st.session_state.get("messages", [])
+            if search_query.lower() in msg.get("content", "").lower()
+        ]
+
+        if filtered_messages:
+            st.markdown(f'<div class="search-results">{len(filtered_messages)} results</div>', unsafe_allow_html=True)
+            for idx, msg in enumerate(filtered_messages):
+                role_icon = "👤" if msg["role"] == "user" else "🤖"
+                role_label = "You" if msg["role"] == "user" else "AI"
+                preview = msg["content"][:55] + "..." if len(msg["content"]) > 55 else msg["content"]
+                st.markdown(
+                    f'<div class="message-preview"><span class="role-badge">{role_icon} {role_label}</span><div class="preview-text">{preview}</div></div>',
+                    unsafe_allow_html=True
+                )
+        else:
+            st.markdown('<div class="empty-state">No messages found</div>', unsafe_allow_html=True)
+    else:
+        # Show all messages
+        if total_messages > 0:
+            # Show recent messages (last 8)
+            recent_messages = st.session_state.get("messages", [])[-8:]
+            for idx, msg in enumerate(recent_messages):
+                role_icon = "👤" if msg["role"] == "user" else "🤖"
+                role_label = "You" if msg["role"] == "user" else "AI"
+                preview = msg["content"][:55] + "..." if len(msg["content"]) > 55 else msg["content"]
+                st.markdown(
+                    f'<div class="message-preview"><span class="role-badge">{role_icon} {role_label}</span><div class="preview-text">{preview}</div></div>',
+                    unsafe_allow_html=True
+                )
+            if total_messages > 8:
+                st.markdown(f'<div class="more-messages">+{total_messages - 8} more messages</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="empty-state">💬 No messages yet<br><span style="font-size: 0.75rem; color: #6b7280;">Start a conversation!</span></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
+
+    # Clear History Button
+    col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
+    with col_clear2:
+        if st.button("🗑️ Clear All", use_container_width=True, key="clear_btn"):
+            st.session_state.messages = []
+            if "conversation_id" in st.session_state:
+                del st.session_state.conversation_id
+            st.rerun()
 
 # Main header
 st.markdown('<div class="main-header">💬 Databricks Data Chat</div>', unsafe_allow_html=True)
@@ -468,7 +634,4 @@ if prompt := st.chat_input("Ask a question about your data..."):
 
 # Footer
 st.divider()
-mode_info = f"Mode: {ai_mode}"
-if ai_mode == "Genie API" and GENIE_SPACE_ID:
-    mode_info += f" | Space: {GENIE_SPACE_ID[:8]}..."
-st.caption(f"Powered by Databricks | Built with Streamlit | {mode_info}")
+st.caption("Powered by Databricks | Built with Streamlit")
