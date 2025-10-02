@@ -1,6 +1,5 @@
-command: ['streamlit', 'run', 'app.py']
+command: ["streamlit", "run", "app.py"]
+
 env:
-  - name: 'STREAMLIT_SERVER_HEADLESS'
-    value: 'true'
-  - name: 'STREAMLIT_BROWSER_GATHER_USAGE_STATS'
-    value: 'false'
+  - name: "GENIE_SPACE_ID"
+    value: "01f09e5ad40117acb8b6b820e30a0f8e"

@@ -2,24 +2,35 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import Config
 import os
 
 # Import helper utilities
 from utils.genie_helper import GenieHelper
-from utils.llm_helper import LLMHelper
 from utils.data_helper import DataHelper
 from utils.report_helper import ReportHelper
 
 # Initialize Databricks WorkspaceClient
 # This automatically authenticates when running on Databricks Apps
-w = WorkspaceClient()
 
-# Initialize helpers
+# 실행 시점에서 강제로 환경변수 제거
+os.environ.pop("DATABRICKS_CLIENT_ID", None)
+os.environ.pop("DATABRICKS_CLIENT_SECRET", None)
+
+host = st.secrets["databricks"]["HOST"]
+token = st.secrets["databricks"]["TOKEN"]
+
+conf = Config(host=host, token=token)
+w = WorkspaceClient(config=conf)
+
 data_helper = DataHelper()
 report_helper = ReportHelper()
 
+
+
 # Configuration - Set your Genie Space ID here
-GENIE_SPACE_ID = st.secrets.get("GENIE_SPACE_ID", "01f09e5ad40117acb8b6b820e30a0f8e")  # Or set via Databricks secrets
+GENIE_SPACE_ID = st.secrets.get("databricks").get("GENIE_SPACE_ID")
+
 
 # Default settings (previously in sidebar)
 ai_mode = "Genie API"  # Default AI mode
@@ -40,27 +51,59 @@ st.set_page_config(
 # Custom CSS for better chat UI and sidebar (Dark theme optimized)
 st.markdown("""
     <style>
+    /* Main content area - Lighter dark theme */
+    .stApp {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    }
+    .main .block-container {
+        background-color: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin-top: 1rem;
+    }
     .stChatMessage {
         padding: 1.25rem;
         border-radius: 0.75rem;
         font-size: 1rem;
+        background-color: rgba(30, 41, 59, 0.5) !important;
+        border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    .stChatMessage[data-testid="user"] {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%) !important;
+        border-left: 3px solid #3b82f6;
+    }
+    .stChatMessage[data-testid="assistant"] {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%) !important;
+        border-left: 3px solid #10b981;
     }
     .main-header {
         font-size: 2.25rem;
         font-weight: 700;
         margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
-    /* Sidebar styling - Dark theme with fixed width */
+    /* Sidebar styling - Darker theme with fixed width */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+        background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+        border-right: 1px solid rgba(71, 85, 105, 0.3);
         width: 300px !important;
         min-width: 300px !important;
         max-width: 300px !important;
-        padding: 1.5rem 1rem !important;
+        padding: 1.5rem 0 !important;
     }
     [data-testid="stSidebar"] > div:first-child {
         width: 300px !important;
         padding: 0 !important;
+    }
+    /* Consistent padding for all sidebar content */
+    [data-testid="stSidebar"] .element-container,
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     /* Remove emotion cache area */
     [data-testid="stSidebar"] .st-emotion-cache-1q82h82 {
@@ -80,17 +123,23 @@ st.markdown("""
         color: #ffffff;
         margin-bottom: 0.5rem;
         letter-spacing: -0.02em;
+        text-align: center;
+        padding: 0 1rem;
     }
     .message-count {
         font-size: 0.8rem;
         color: #9ca3af;
         font-weight: 500;
+        text-align: center;
+        padding: 0 1rem;
     }
     .sidebar-spacing {
         height: 1rem;
+        padding: 0 !important;
     }
     .sidebar-section-spacing {
         height: 1.25rem;
+        padding: 0 !important;
     }
     .section-title {
         font-size: 0.875rem;
@@ -99,6 +148,8 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-bottom: 0.75rem;
+        text-align: center;
+        padding: 0 1rem;
     }
     [data-testid="stSidebar"] h1 {
         display: none;
@@ -113,35 +164,36 @@ st.markdown("""
         padding: 0.4rem 0.6rem;
         border-radius: 0.3rem;
         white-space: nowrap;
-        background-color: #2d2d2d;
-        border: 1px solid #404040;
-        color: #ffffff;
+        background-color: #1a1a1a;
+        border: 1px solid #2d2d2d;
+        color: #d1d5db;
         transition: all 0.15s ease;
         box-shadow: none;
         min-height: auto;
         height: auto;
     }
     [data-testid="stSidebar"] button:hover {
-        background-color: #3a3a3a;
-        border-color: #525252;
+        background-color: #252525;
+        border-color: #3b82f6;
         color: #ffffff;
     }
     [data-testid="stSidebar"] button:active {
-        background-color: #252525;
+        background-color: #0f0f0f;
         transform: scale(0.98);
     }
     /* New Chat button specific styling */
     [data-testid="stSidebar"] button[kind="primary"],
     [data-testid="stSidebar"] button:first-of-type {
-        background-color: #1f2937;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%);
         border: 1px solid #3b82f6;
         color: #93c5fd;
     }
     [data-testid="stSidebar"] button[kind="primary"]:hover,
     [data-testid="stSidebar"] button:first-of-type:hover {
-        background-color: #374151;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.2) 100%);
         border-color: #60a5fa;
         color: #bfdbfe;
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
     }
     /* Button text container */
     [data-testid="stSidebar"] button > div {
@@ -155,21 +207,22 @@ st.markdown("""
     /* Message preview styling - Modern card design */
     .message-preview {
         padding: 0.75rem;
-        margin: 0.5rem 0;
+        margin: 0.5rem 1rem;
         border-radius: 0.5rem;
-        background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+        background: linear-gradient(135deg, rgba(26, 26, 26, 0.8) 0%, rgba(15, 15, 15, 0.8) 100%);
         border-left: 3px solid #3b82f6;
         transition: all 0.2s ease;
         word-wrap: break-word;
         overflow-wrap: break-word;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         cursor: pointer;
+        backdrop-filter: blur(10px);
     }
     .message-preview:hover {
-        background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
         border-left-color: #60a5fa;
-        transform: translateX(2px);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        transform: translateX(3px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
     .role-badge {
         display: inline-block;
@@ -188,6 +241,8 @@ st.markdown("""
         color: #9ca3af;
         margin-bottom: 0.5rem;
         font-weight: 500;
+        text-align: center;
+        padding: 0 1rem;
     }
     .empty-state {
         text-align: center;
@@ -195,12 +250,13 @@ st.markdown("""
         color: #9ca3af;
         font-size: 0.875rem;
         line-height: 1.5rem;
+        margin: 0 1rem;
     }
     .more-messages {
         text-align: center;
         font-size: 0.75rem;
         color: #9ca3af;
-        margin-top: 0.75rem;
+        margin: 0.75rem 1rem 0;
         padding: 0.5rem;
         background-color: #1f2937;
         border-radius: 0.375rem;
@@ -210,16 +266,17 @@ st.markdown("""
         font-size: 0.875rem;
         padding: 0.625rem 0.875rem;
         border-radius: 0.5rem;
-        background-color: #2d2d2d;
+        background-color: rgba(26, 26, 26, 0.8);
         color: #ffffff;
-        border: 1.5px solid #404040;
+        border: 1.5px solid #2d2d2d;
         width: 100%;
         transition: all 0.2s ease;
+        backdrop-filter: blur(10px);
     }
     [data-testid="stSidebar"] input:focus {
         border-color: #3b82f6;
-        background-color: #333333;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        background-color: rgba(30, 30, 30, 0.9);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     }
     [data-testid="stSidebar"] input::placeholder {
         color: #6b7280;
@@ -356,14 +413,12 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
 
-    # Clear History Button
-    col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
-    with col_clear2:
-        if st.button("🗑️ Clear All", use_container_width=True, key="clear_btn"):
-            st.session_state.messages = []
-            if "conversation_id" in st.session_state:
-                del st.session_state.conversation_id
-            st.rerun()
+    # Clear History Button - centered
+    if st.button("🗑️ Clear All", use_container_width=True, key="clear_btn"):
+        st.session_state.messages = []
+        if "conversation_id" in st.session_state:
+            del st.session_state.conversation_id
+        st.rerun()
 
 # Main header
 st.markdown('<div class="main-header">💬 Databricks Data Chat</div>', unsafe_allow_html=True)
@@ -492,104 +547,7 @@ if prompt := st.chat_input("Ask a question about your data..."):
                         "content": error_msg
                     })
 
-        elif ai_mode == "LLM Endpoint (Databricks)" and 'llm_endpoint' in locals() and llm_endpoint:
-            # Use Databricks LLM Endpoint
-            llm = LLMHelper(w, provider="databricks")
-
-            with st.spinner("🤖 Calling Databricks LLM..."):
-                # Build message history for context
-                messages = [
-                    {"role": "system", "content": "You are a helpful data analyst assistant. Help users analyze their data and answer questions."}
-                ]
-
-                # Add recent conversation history (last 5 messages)
-                for msg in st.session_state.messages[-5:]:
-                    if msg["role"] in ["user", "assistant"]:
-                        messages.append({
-                            "role": msg["role"] if msg["role"] == "user" else "assistant",
-                            "content": msg["content"]
-                        })
-
-                # Add current prompt
-                messages.append({"role": "user", "content": prompt})
-
-                # Call LLM
-                result = llm.chat_completion(llm_endpoint, messages)
-
-                if result["success"]:
-                    response_text = result["content"] or "No response from LLM"
-                    st.markdown(response_text)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": response_text
-                    })
-                else:
-                    error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg
-                    })
-
-        elif ai_mode == "LLM Endpoint (Bedrock)":
-            # Use AWS Bedrock
-            try:
-                # Initialize Bedrock LLM Helper
-                llm = LLMHelper(
-                    provider="bedrock",
-                    bedrock_region=bedrock_region,
-                    aws_access_key_id=aws_access_key if aws_access_key else None,
-                    aws_secret_access_key=aws_secret_key if aws_secret_key else None
-                )
-
-                with st.spinner(f"🤖 Calling AWS Bedrock ({bedrock_model.split('.')[-1]})..."):
-                    # Build message history for context
-                    messages = [
-                        {"role": "system", "content": "You are a helpful data analyst assistant. Help users analyze their data and answer questions."}
-                    ]
-
-                    # Add recent conversation history (last 5 messages)
-                    for msg in st.session_state.messages[-5:]:
-                        if msg["role"] in ["user", "assistant"]:
-                            messages.append({
-                                "role": msg["role"] if msg["role"] == "user" else "assistant",
-                                "content": msg["content"]
-                            })
-
-                    # Add current prompt
-                    messages.append({"role": "user", "content": prompt})
-
-                    # Call Bedrock
-                    result = llm.chat_completion(bedrock_model, messages)
-
-                    if result["success"]:
-                        response_text = result["content"] or "No response from Bedrock"
-                        st.markdown(response_text)
-
-                        # Show token usage if available
-                        if "usage" in result and result["usage"]:
-                            with st.expander("📊 Token Usage"):
-                                usage = result["usage"]
-                                st.json(usage)
-
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": response_text
-                        })
-                    else:
-                        error_msg = f"❌ Bedrock Error: {result.get('error', 'Unknown error')}"
-                        st.error(error_msg)
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": error_msg
-                        })
-            except Exception as e:
-                error_msg = f"❌ Bedrock Configuration Error: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": error_msg
-                })
+        
 
         else:
             # Mock mode (demo)
