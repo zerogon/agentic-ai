@@ -1,44 +1,29 @@
 """
 LLM Helper Functions
-Provides utilities for interacting with Databricks Model Serving endpoints and AWS Bedrock
+Provides utilities for interacting with Databricks Model Serving endpoints 
 """
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
-from typing import List, Dict, Optional, Union
-from .bedrock_helper import BedrockHelper
-
+from typing import List, Dict, Optional
 
 class LLMHelper:
     def __init__(
         self,
         workspace_client: Optional[WorkspaceClient] = None,
-        provider: str = "databricks",
-        bedrock_region: str = "us-east-1",
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None
+        provider: str = "databricks"
     ):
         """
-        Initialize LLM Helper - supports both Databricks and AWS Bedrock
+        Initialize LLM Helper - supports both Databricks 
 
         Args:
             workspace_client: Databricks WorkspaceClient instance (required for Databricks provider)
-            provider: LLM provider - "databricks" or "bedrock"
-            bedrock_region: AWS region for Bedrock (default: us-east-1)
-            aws_access_key_id: AWS access key for Bedrock
-            aws_secret_access_key: AWS secret key for Bedrock
+            provider: LLM provider - "databricks" 
         """
         self.provider = provider.lower()
         self.w = workspace_client
-        self.bedrock = None
-
-        if self.provider == "bedrock":
-            self.bedrock = BedrockHelper(
-                region_name=bedrock_region,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key
-            )
-        elif self.provider == "databricks" and not workspace_client:
+ 
+        if self.provider == "databricks" and not workspace_client:
             raise ValueError("workspace_client is required for Databricks provider")
 
     def chat_completion(
@@ -49,10 +34,10 @@ class LLMHelper:
         max_tokens: Optional[int] = None
     ) -> Dict:
         """
-        Call chat completion endpoint (works with both Databricks and Bedrock)
+        Call chat completion endpoint (works with both Databricks)
 
         Args:
-            endpoint_name: Name of the serving endpoint (Databricks) or model ID (Bedrock)
+            endpoint_name: Name of the serving endpoint (Databricks)
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
@@ -60,45 +45,37 @@ class LLMHelper:
         Returns:
             Response dictionary
         """
-        if self.provider == "bedrock":
-            # Use Bedrock
-            return self.bedrock.chat_completion(
-                messages=messages,
-                model_id=endpoint_name,
-                temperature=temperature,
-                max_tokens=max_tokens or 4096
-            )
-        else:
-            # Use Databricks
-            try:
-                chat_messages = [
-                    ChatMessage(
-                        role=ChatMessageRole.SYSTEM if msg["role"] == "system" else ChatMessageRole.USER,
-                        content=msg["content"]
-                    )
-                    for msg in messages
-                ]
-
-                response = self.w.serving_endpoints.query(
-                    name=endpoint_name,
-                    messages=chat_messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens
+  
+        # Use Databricks
+        try:
+            chat_messages = [
+                ChatMessage(
+                    role=ChatMessageRole.SYSTEM if msg["role"] == "system" else ChatMessageRole.USER,
+                    content=msg["content"]
                 )
+                for msg in messages
+            ]
 
-                return {
-                    "success": True,
-                    "response": response.as_dict(),
-                    "content": self._extract_content(response.as_dict()),
-                    "provider": "databricks"
-                }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "error": str(e),
-                    "content": None,
-                    "provider": "databricks"
-                }
+            response = self.w.serving_endpoints.query(
+                name=endpoint_name,
+                messages=chat_messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            return {
+                "success": True,
+                "response": response.as_dict(),
+                "content": self._extract_content(response.as_dict()),
+                "provider": "databricks"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "content": None,
+                "provider": "databricks"
+            }
 
     def text_completion(
         self,
@@ -108,10 +85,10 @@ class LLMHelper:
         max_tokens: Optional[int] = None
     ) -> Dict:
         """
-        Call text completion endpoint (works with both Databricks and Bedrock)
+        Call text completion endpoint (works with both Databricks )
 
         Args:
-            endpoint_name: Name of the serving endpoint (Databricks) or model ID (Bedrock)
+            endpoint_name: Name of the serving endpoint (Databricks) 
             prompt: Input prompt
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
@@ -119,37 +96,28 @@ class LLMHelper:
         Returns:
             Response dictionary
         """
-        if self.provider == "bedrock":
-            # Use Bedrock
-            return self.bedrock.text_completion(
-                prompt=prompt,
-                model_id=endpoint_name,
-                temperature=temperature,
-                max_tokens=max_tokens or 4096
-            )
-        else:
-            # Use Databricks
-            try:
-                response = self.w.serving_endpoints.query(
-                    name=endpoint_name,
-                    prompt=prompt,
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
 
-                return {
-                    "success": True,
-                    "response": response.as_dict(),
-                    "content": self._extract_content(response.as_dict()),
-                    "provider": "databricks"
-                }
-            except Exception as e:
-                return {
-                    "success": False,
-                    "error": str(e),
-                    "content": None,
-                    "provider": "databricks"
-                }
+        try:
+            response = self.w.serving_endpoints.query(
+                name=endpoint_name,
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            return {
+                "success": True,
+                "response": response.as_dict(),
+                "content": self._extract_content(response.as_dict()),
+                "provider": "databricks"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "content": None,
+                "provider": "databricks"
+            }
 
     def get_embeddings(
         self,
@@ -166,13 +134,6 @@ class LLMHelper:
         Returns:
             Response dictionary with embeddings
         """
-        if self.provider == "bedrock":
-            return {
-                "success": False,
-                "error": "Embeddings not supported via Bedrock helper. Use Databricks or direct Bedrock embedding models.",
-                "embeddings": None
-            }
-
         try:
             response = self.w.serving_endpoints.query(
                 name=endpoint_name,
@@ -200,16 +161,14 @@ class LLMHelper:
         Returns:
             List of model information
         """
-        if self.provider == "bedrock":
-            return self.bedrock.get_available_models()
-        else:
-            return [
-                {
-                    "model_id": "custom-endpoint",
-                    "name": "Databricks Serving Endpoint",
-                    "description": "Custom model deployed on Databricks Model Serving"
-                }
-            ]
+
+        return [
+            {
+                "model_id": "custom-endpoint",
+                "name": "Databricks Serving Endpoint",
+                "description": "Custom model deployed on Databricks Model Serving"
+            }
+        ]
 
     def _extract_content(self, response: Dict) -> Optional[str]:
         """

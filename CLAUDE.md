@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Databricks Apps** application that provides a chat-based interface for interacting with data using natural language queries. The app integrates multiple AI backends (Genie, Databricks LLM, AWS Bedrock) and generates professional reports (PDF/HTML).
+This is a **Databricks Apps** application that provides a chat-based interface for interacting with data using natural language queries. The app integrates multiple AI backends (Genie, Databricks LLM) and generates professional reports (PDF/HTML).
 
 **Key constraint**: Databricks Apps requires a single-process architecture. There is no separate backend/frontend - everything runs in one Streamlit process.
 
@@ -17,7 +17,7 @@ app.py (Streamlit UI + Business Logic)
     ↓
 Helper Modules (utils/)
     ↓
-External Services (Databricks SDK, AWS Bedrock, Plotly)
+External Services (Databricks SDK, Plotly)
 ```
 
 **Why this matters**:
@@ -36,17 +36,12 @@ All business logic is in `utils/` as standalone helper classes:
    - `process_response()` - Parse Genie responses into messages with data/code
 
 2. **`llm_helper.py`**: Multi-provider LLM interface
-   - Supports **two providers**: `databricks` and `bedrock`
+   - Supports **two providers**: `databricks`
    - Single unified interface: `chat_completion()` works for both
    - Provider switching via `provider` parameter in constructor
-   - **Important**: For Databricks provider, pass `WorkspaceClient`; for Bedrock, pass AWS credentials
+   - **Important**: For Databricks provider, pass `WorkspaceClient`; 
 
-3. **`bedrock_helper.py`**: AWS Bedrock Claude models
-   - Direct boto3 integration
-   - Supports Claude 3 family (Opus, Sonnet, Haiku) and Claude 2.x
-   - `analyze_data()` and `generate_sql_explanation()` for specialized tasks
-
-4. **`data_helper.py`**: Visualization and data processing
+3. **`data_helper.py`**: Visualization and data processing
    - `create_chart()` - Generate Plotly charts from DataFrames
    - `auto_detect_chart_type()` - Smart chart type selection
    - `format_sql_code()` - SQL formatting for display
@@ -86,16 +81,6 @@ databricks auth login --host <workspace-url>
 
 # Deploy
 databricks apps deploy <app-name> --source-code-path .
-```
-
-### AWS Bedrock Setup (Optional)
-```bash
-# Configure AWS credentials
-aws configure
-# OR
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-export AWS_DEFAULT_REGION=us-east-1
 ```
 
 ## Working with AI Modes
@@ -174,10 +159,6 @@ report.clear()
    - HTML embeds Plotly.js (large file size)
    - Tables truncated to 50 rows in PDF
 
-4. **AWS Bedrock**:
-   - Model IDs must match exact format: `anthropic.claude-3-sonnet-20240229-v1:0`
-   - Token usage in `response["usage"]` (input_tokens, output_tokens)
-   - Requires IAM permission: `bedrock:InvokeModel`
 
 ## Configuration Files
 
@@ -197,7 +178,7 @@ Core dependencies:
 - `plotly>=5.17.0` - Visualizations
 - `reportlab>=4.0.0` - PDF generation
 - `jinja2>=3.1.0` - HTML templating
-- `boto3>=1.34.0` - AWS Bedrock (optional)
+
 
 ## Testing
 
@@ -207,17 +188,6 @@ Core dependencies:
 streamlit run app.py
 # Select "Genie API", enter Space ID, ask data question
 
-# 2. Test Bedrock mode
-export AWS_ACCESS_KEY_ID=...
-streamlit run app.py
-# Select "LLM Endpoint (Bedrock)", choose model, chat
-
-# 3. Test report export
-# Have conversation → Click "Export PDF" → Verify download
-
-# 4. Test visualization
-# Get data from Genie → Check chart appears → Try different chart types
-```
 
 ### Example Scripts
 ```bash
@@ -225,9 +195,6 @@ streamlit run app.py
 python examples/report_example.py
 # Generates: business_report.pdf, business_report.html
 
-# Run Bedrock examples (requires AWS setup)
-python examples/bedrock_example.py
-```
 
 ## Common Issues
 
@@ -241,13 +208,6 @@ python examples/bedrock_example.py
 - Space ID is valid and accessible
 - User has permissions to Genie Space
 - Query matches available data schemas
-
-### Bedrock Authentication
-**Problem**: `NoCredentialsError` or `AccessDeniedException`
-**Solution**:
-- Verify AWS credentials: `aws sts get-caller-identity`
-- Check IAM policy has `bedrock:InvokeModel`
-- Confirm model available in region (Claude 3 in us-east-1, us-west-2, eu-west-1)
 
 ### PDF Generation Fails
 **Problem**: Image export errors or kaleido issues
@@ -264,7 +224,7 @@ When discussing code locations, use these patterns:
 ## Documentation
 
 - **User Guide**: `PHASE2_FEATURES.md` - Complete feature documentation
-- **Examples**: `examples/` - Standalone examples for report generation and Bedrock
+- **Examples**: `examples/` - Standalone examples for report generatio
 - **README**: Overview and deployment instructions
 
 ## Key Learnings for New Features
