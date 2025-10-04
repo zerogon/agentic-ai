@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import re
+import time
 from databricks.sdk import WorkspaceClient
 from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
@@ -80,25 +82,44 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
         # Process query based on selected AI mode
         with st.chat_message("assistant"):
             if ai_mode == "Genie API" and genie_space_id:
-                # Use Routing Model to analyze query
+                # Use Routing Model to analyze query with streaming
                 router = RouteHelper()
 
+                # Show loading spinner
                 with st.spinner("🔍 Analyzing query..."):
-                    routing_result = router.analyze_query(prompt)
+                    # Collect streamed content (hidden from user)
+                    streamed_text = ""
+                    for chunk in router.analyze_query(prompt, stream=True):
+                        streamed_text += chunk
 
-                # Display routing information (for debugging/transparency)
+                    # Parse the complete response
+                    routing_result = router.parse_last_stream_result()
+
+                # Now stream the execution plan with typing effect
                 if routing_result["success"]:
-                    # Extract and display execution plan prominently
                     rationale = routing_result.get("rationale", {})
                     if isinstance(rationale, dict):
                         execution_plan = rationale.get("execution_plan", "")
-                        understanding = rationale.get("understanding", "")
 
-                        # Display execution plan first (most important for user)
                         if execution_plan:
-                            st.info(f"📋 **실행 계획**\n\n{execution_plan}")
+                            st.markdown("📋 **실행 계획**")
 
-                        # Display understanding if available
+                            # Create placeholder for streaming text
+                            plan_container = st.empty()
+                            displayed_text = ""
+
+                            # Stream word by word for better performance
+                            words = execution_plan.split()
+                            for i, word in enumerate(words):
+                                displayed_text += word
+                                if i < len(words) - 1:
+                                    displayed_text += " "
+
+                                # Update display
+                                plan_container.markdown(displayed_text)
+                                time.sleep(0.03)  # Delay for typing effect
+
+                        understanding = rationale.get("understanding", "")
                         if understanding:
                             st.write(f"💡 {understanding}")
 
@@ -137,8 +158,26 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                 # Execute Genie query - single or multi-domain
                 if is_multi_domain:
-                    # Multi-domain parallel execution
-                    with st.spinner("🤖 Asking multiple Genies in parallel..."):
+                    # Multi-domain parallel execution with progress tracking
+                    status_container = st.status("🔄 Processing multiple Genies...", expanded=True)
+
+                    with status_container:
+                        st.write("🚀 **Starting parallel execution...**")
+                        st.write("")  # Spacing
+
+                        # Create progress placeholders with columns for better layout
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.markdown("### 📊 SALES_GENIE")
+                            sales_progress = st.empty()
+                            sales_spinner = st.empty()
+
+                        with col2:
+                            st.markdown("### 📄 CONTRACT_GENIE")
+                            contract_progress = st.empty()
+                            contract_spinner = st.empty()
+
                         # Prepare parallel tasks
                         tasks = []
                         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -146,17 +185,53 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 if domain in genie_domains:
                                     space_id = get_space_id_by_domain(domain)
                                     conv_id = st.session_state.conversation_ids.get(domain)
+
+                                    # Update progress before submission
+                                    if domain == "SALES_GENIE":
+                                        sales_progress.info("⏸️ Queued...")
+                                    else:
+                                        contract_progress.info("⏸️ Queued...")
+
                                     future = executor.submit(
                                         execute_genie_query,
                                         w, space_id, domain, prompt, conv_id
                                     )
                                     tasks.append((future, domain))
 
-                            # Collect results
+                            # Collect results with progress updates
                             genie_results = {}
                             for future, domain in tasks:
-                                result = future.result()
+                                # Update to processing with spinner
+                                if domain == "SALES_GENIE":
+                                    sales_progress.empty()
+                                    with sales_spinner:
+                                        with st.spinner("🔄 Processing query..."):
+                                            result = future.result()
+                                else:
+                                    contract_progress.empty()
+                                    with contract_spinner:
+                                        with st.spinner("🔄 Processing query..."):
+                                            result = future.result()
+
                                 genie_results[domain] = result
+
+                                # Update to complete
+                                if result["success"]:
+                                    if domain == "SALES_GENIE":
+                                        sales_spinner.empty()
+                                        sales_progress.success("✅ Complete!")
+                                    else:
+                                        contract_spinner.empty()
+                                        contract_progress.success("✅ Complete!")
+                                else:
+                                    if domain == "SALES_GENIE":
+                                        sales_spinner.empty()
+                                        sales_progress.error(f"❌ Error: {result['error']}")
+                                    else:
+                                        contract_spinner.empty()
+                                        contract_progress.error(f"❌ Error: {result['error']}")
+
+                        status_container.update(label="✅ Processing complete!", state="complete")
 
                         # Process results in order: SALES_GENIE first, then CONTRACT_GENIE
                         for domain in ["SALES_GENIE", "CONTRACT_GENIE"]:
@@ -268,10 +343,20 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         update_current_session_messages()
 
                 else:
-                    # Single-domain execution (original logic)
+                    # Single-domain execution with progress tracking
                     genie = GenieHelper(w, selected_space_id)
 
-                    with st.spinner("🤖 Asking Genie..."):
+                    # Create status container for progress
+                    status_container = st.status("Processing query...", expanded=True)
+
+                    # Progress callback
+                    progress_placeholder = st.empty()
+                    def update_progress(icon: str, message: str):
+                        progress_placeholder.markdown(f"{icon} {message}")
+
+                    genie.set_progress_callback(update_progress)
+
+                    with status_container:
                         # Get conversation ID from dict or legacy single ID
                         conv_id = None
                         if genie_domains and len(genie_domains) > 0:
@@ -285,6 +370,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         else:
                             # Start new conversation
                             result = genie.start_conversation(prompt)
+
+                        status_container.update(label="Query complete!", state="complete")
 
                         if result["success"]:
                             # Store conversation ID (both legacy and new format)

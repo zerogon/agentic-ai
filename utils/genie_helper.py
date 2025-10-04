@@ -19,6 +19,21 @@ class GenieHelper:
         """
         self.w = workspace_client
         self.genie_space_id = genie_space_id
+        self.progress_callback = None
+
+    def set_progress_callback(self, callback):
+        """
+        Set callback function for progress updates
+
+        Args:
+            callback: Function to call with progress updates (status: str, step: str)
+        """
+        self.progress_callback = callback
+
+    def _update_progress(self, status: str, step: str):
+        """Internal method to update progress"""
+        if self.progress_callback:
+            self.progress_callback(status, step)
 
     def start_conversation(self, prompt: str) -> Dict:
         """
@@ -31,16 +46,22 @@ class GenieHelper:
             Conversation response object
         """
         try:
+            self._update_progress("🔍", "Analyzing query...")
+
             conversation = self.w.genie.start_conversation_and_wait(
                 self.genie_space_id,
                 prompt
             )
+
+            self._update_progress("✅", "Query complete")
+
             return {
                 "conversation_id": conversation.conversation_id,
                 "response": conversation,
                 "success": True
             }
         except Exception as e:
+            self._update_progress("❌", f"Error: {str(e)}")
             return {
                 "conversation_id": None,
                 "response": None,
@@ -60,17 +81,23 @@ class GenieHelper:
             Conversation response object
         """
         try:
+            self._update_progress("🔍", "Processing follow-up query...")
+
             conversation = self.w.genie.create_message_and_wait(
                 self.genie_space_id,
                 conversation_id,
                 prompt
             )
+
+            self._update_progress("✅", "Follow-up complete")
+
             return {
                 "conversation_id": conversation_id,
                 "response": conversation,
                 "success": True
             }
         except Exception as e:
+            self._update_progress("❌", f"Error: {str(e)}")
             return {
                 "conversation_id": conversation_id,
                 "response": None,
