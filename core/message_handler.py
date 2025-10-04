@@ -39,11 +39,19 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                 # Display routing information (for debugging/transparency)
                 if routing_result["success"]:
-                    with st.expander("🎯 Routing Analysis", expanded=False):
-                        st.write(f"**Intents:** {', '.join(routing_result['intents'])}")
-                        st.write(f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}")
-                        st.write(f"**Keywords:** {', '.join(routing_result['keywords'])}")
-                        st.write(f"**Rationale:** {routing_result['rationale']}")
+                    # Extract and display execution plan prominently
+                    rationale = routing_result.get("rationale", {})
+                    if isinstance(rationale, dict):
+                        execution_plan = rationale.get("execution_plan", "")
+                        understanding = rationale.get("understanding", "")
+
+                        # Display execution plan first (most important for user)
+                        if execution_plan:
+                            st.info(f"📋 **실행 계획**\n\n{execution_plan}")
+
+                        # Display understanding if available
+                        if understanding:
+                            st.write(f"💡 {understanding}")
 
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]
@@ -52,9 +60,14 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         selected_domain = genie_domains[0]
                         selected_space_id = get_space_id_by_domain(selected_domain)
 
-                        st.info(f"🎯 Using {selected_domain} for this query")
+                        st.caption(f"🎯 Using {selected_domain} for this query")
+
+                        # Detailed routing analysis (for debugging)
+                        with st.expander("🔍 Routing Details", expanded=False):
+                            st.write(f"**Intents:** {', '.join(routing_result['intents'])}")
+                            st.write(f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}")
+                            st.write(f"**Keywords:** {', '.join(routing_result['keywords'])}")
                     else:
-                        # Fallback to default
                         selected_space_id = genie_space_id
                         st.warning("⚠️ No specific domain detected, using default Genie")
                 else:

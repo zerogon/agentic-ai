@@ -43,9 +43,7 @@ def get_genie_spaces():
         "CONTRACT_GENIE": genie_spaces.get("CONTRACT_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID")),
         "REGION_GENIE": genie_spaces.get("REGION_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))
     }
-
     return spaces_dict
-
 
 def get_space_id_by_domain(domain: str):
     """
