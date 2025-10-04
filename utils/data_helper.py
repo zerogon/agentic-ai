@@ -25,7 +25,7 @@ class DataHelper:
             df: Input DataFrame
             chart_type: Type of chart (bar, line, pie, scatter, etc.)
             x_col: Column for x-axis
-            y_col: Column for y-axis
+            y_col: Column for y-axis (can be list for multiple lines)
             title: Chart title
 
         Returns:
@@ -37,8 +37,18 @@ class DataHelper:
         # Auto-detect columns if not specified
         if not x_col and len(df.columns) > 0:
             x_col = df.columns[0]
+
+        # For line and bar charts, if y_col not specified, use all numeric columns
         if not y_col and len(df.columns) > 1:
-            y_col = df.columns[1]
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            if len(numeric_cols) > 0:
+                # Exclude x_col from numeric columns if it's numeric
+                if x_col in numeric_cols:
+                    numeric_cols.remove(x_col)
+                # Use first numeric column or all if multiple
+                y_col = numeric_cols[0] if len(numeric_cols) == 1 else numeric_cols
+            else:
+                y_col = df.columns[1]
 
         chart_type = chart_type.lower()
 
@@ -46,7 +56,22 @@ class DataHelper:
             if chart_type == "bar":
                 fig = px.bar(df, x=x_col, y=y_col, title=title)
             elif chart_type == "line":
-                fig = px.line(df, x=x_col, y=y_col, title=title)
+                # Line chart with support for multiple y columns
+                if isinstance(y_col, list):
+                    fig = px.line(df, x=x_col, y=y_col, title=title)
+                else:
+                    fig = px.line(df, x=x_col, y=y_col, title=title, markers=True)
+
+                # Force stable SVG rendering to avoid WebGL issues
+                fig.update_layout(
+                    autosize=True,
+                    hovermode='closest',
+                    template='plotly'
+                )
+                fig.update_traces(
+                    line=dict(width=2),
+                    marker=dict(size=4)
+                )
             elif chart_type == "pie":
                 fig = px.pie(df, names=x_col, values=y_col, title=title)
             elif chart_type == "scatter":
@@ -62,11 +87,26 @@ class DataHelper:
                 # Default to bar chart
                 fig = px.bar(df, x=x_col, y=y_col, title=title)
 
+            # Apply common stable rendering settings to all chart types
+            if fig:
+                fig.update_layout(
+                    modebar_remove=['lasso2d', 'select2d'],
+                    dragmode='pan'
+                )
+
             return fig
 
         except Exception as e:
             print(f"Error creating chart: {e}")
-            return None
+            # Fallback: try simple bar chart
+            try:
+                if not x_col:
+                    x_col = df.columns[0]
+                if not y_col:
+                    y_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+                return px.bar(df, x=x_col, y=y_col, title=title)
+            except:
+                return None
 
     @staticmethod
     def auto_detect_chart_type(df: pd.DataFrame) -> str:

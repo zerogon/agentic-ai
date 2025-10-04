@@ -21,7 +21,11 @@ def init_session_state(ai_mode: str):
     if "messages" not in st.session_state:
         st.session_state.messages = get_current_session_messages()
 
-    # Initialize conversation ID for Genie
+    # Initialize conversation IDs for multi-Genie support
+    if "conversation_ids" not in st.session_state:
+        st.session_state.conversation_ids = {}
+
+    # Legacy single conversation_id support (backward compatibility)
     if "conversation_id" not in st.session_state:
         st.session_state.conversation_id = None
 
@@ -45,7 +49,9 @@ def create_new_session(ai_mode: str):
     st.session_state.current_session_id = session_id
     st.session_state.messages = [welcome_message]
 
-    # Clear Genie conversation ID for new session
+    # Clear Genie conversation IDs for new session
+    if "conversation_ids" in st.session_state:
+        st.session_state.conversation_ids = {}
     if "conversation_id" in st.session_state:
         st.session_state.conversation_id = None
 
@@ -60,7 +66,9 @@ def switch_session(session_id: str):
         st.session_state.current_session_id = session_id
         st.session_state.messages = session["messages"].copy()
 
-        # Clear Genie conversation ID when switching sessions
+        # Clear Genie conversation IDs when switching sessions
+        if "conversation_ids" in st.session_state:
+            st.session_state.conversation_ids = {}
         if "conversation_id" in st.session_state:
             st.session_state.conversation_id = None
 
