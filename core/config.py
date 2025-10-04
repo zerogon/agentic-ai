@@ -26,3 +26,36 @@ def get_config():
         "ai_mode": "Genie API",  # Default AI mode
         "chart_type": "Auto"      # Default chart type
     }
+
+
+def get_genie_spaces():
+    """
+    Get Genie Space ID mapping for routing
+
+    Returns:
+        Dict mapping Genie domain names to Space IDs
+    """
+    genie_spaces = st.secrets.get("genie_spaces", {})
+
+    # Convert to regular dict and provide fallback
+    spaces_dict = {
+        "SALES_GENIE": genie_spaces.get("SALES_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID")),
+        "CONTRACT_GENIE": genie_spaces.get("CONTRACT_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID")),
+        "REGION_GENIE": genie_spaces.get("REGION_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))
+    }
+
+    return spaces_dict
+
+
+def get_space_id_by_domain(domain: str):
+    """
+    Get Genie Space ID by domain name
+
+    Args:
+        domain: Genie domain name (e.g., "SALES_GENIE")
+
+    Returns:
+        Genie Space ID for the specified domain
+    """
+    spaces = get_genie_spaces()
+    return spaces.get(domain, st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))

@@ -3,7 +3,9 @@ import pandas as pd
 from databricks.sdk import WorkspaceClient
 from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
+from utils.route_helper import RouteHelper
 from ui.session import update_current_session_messages
+from core.config import get_space_id_by_domain
 
 
 def handle_chat_input(w: WorkspaceClient, config: dict):
@@ -29,8 +31,39 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
         # Process query based on selected AI mode
         with st.chat_message("assistant"):
             if ai_mode == "Genie API" and genie_space_id:
-                # Use Genie API
-                genie = GenieHelper(w, genie_space_id)
+                # Use Routing Model to analyze query
+                router = RouteHelper()
+
+                with st.spinner("🔍 Analyzing query..."):
+                    routing_result = router.analyze_query(prompt)
+
+                # Display routing information (for debugging/transparency)
+                if routing_result["success"]:
+                    with st.expander("🎯 Routing Analysis", expanded=False):
+                        st.write(f"**Intents:** {', '.join(routing_result['intents'])}")
+                        st.write(f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}")
+                        st.write(f"**Keywords:** {', '.join(routing_result['keywords'])}")
+                        st.write(f"**Rationale:** {routing_result['rationale']}")
+
+                    # Select Genie Space based on routing result
+                    genie_domains = routing_result["genie_domain"]
+                    if genie_domains:
+                        # Use first domain for now (TODO: handle multi-domain queries)
+                        selected_domain = genie_domains[0]
+                        selected_space_id = get_space_id_by_domain(selected_domain)
+
+                        st.info(f"🎯 Using {selected_domain} for this query")
+                    else:
+                        # Fallback to default
+                        selected_space_id = genie_space_id
+                        st.warning("⚠️ No specific domain detected, using default Genie")
+                else:
+                    # Routing failed, use default
+                    selected_space_id = genie_space_id
+                    st.warning(f"⚠️ Routing analysis failed: {routing_result.get('error', 'Unknown error')}")
+
+                # Use Genie API with selected Space ID
+                genie = GenieHelper(w, selected_space_id)
 
                 with st.spinner("🤖 Asking Genie..."):
                     if st.session_state.conversation_id:
