@@ -1,4 +1,6 @@
 import streamlit as st
+from ui.session import create_new_session, switch_session, get_session_preview
+from core.config import get_config
 
 
 def render_sidebar():
@@ -15,9 +17,8 @@ def render_sidebar():
 
         # New Chat Button
         if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn"):
-            st.session_state.messages = []
-            if "conversation_id" in st.session_state:
-                del st.session_state.conversation_id
+            config = get_config()
+            create_new_session(config["ai_mode"])
             st.rerun()
 
         st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
@@ -33,49 +34,75 @@ def render_sidebar():
         st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
         st.markdown('<div class="section-title">Recent Chats</div>', unsafe_allow_html=True)
 
-        # Chat history container
+        # Display chat sessions
+        chat_sessions = st.session_state.get("chat_sessions", [])
+
         if search_query:
-            # Filter messages by search query
-            filtered_messages = [
-                msg for msg in st.session_state.get("messages", [])
-                if search_query.lower() in msg.get("content", "").lower()
+            # Filter sessions by search query
+            filtered_sessions = [
+                session for session in chat_sessions
+                if any(search_query.lower() in msg.get("content", "").lower() for msg in session["messages"])
             ]
 
-            if filtered_messages:
-                st.markdown(f'<div class="search-results">{len(filtered_messages)} results</div>', unsafe_allow_html=True)
-                for idx, msg in enumerate(filtered_messages):
-                    role_icon = "👤" if msg["role"] == "user" else "🤖"
-                    role_label = "You" if msg["role"] == "user" else "AI"
-                    preview = msg["content"][:55] + "..." if len(msg["content"]) > 55 else msg["content"]
+            if filtered_sessions:
+                st.markdown(f'<div class="search-results">{len(filtered_sessions)} sessions found</div>', unsafe_allow_html=True)
+                for session in filtered_sessions:
+                    is_current = session["id"] == st.session_state.get("current_session_id")
+                    preview = get_session_preview(session)
+                    timestamp = session["created_at"].strftime("%m/%d %H:%M")
+
+                    # Create clickable session button
+                    button_key = f"session_{session['id']}"
+                    button_label = f"{'📍' if is_current else '💬'} {preview}"
+
+                    if st.button(button_label, key=button_key, use_container_width=True):
+                        if not is_current:
+                            switch_session(session["id"])
+                            st.rerun()
+
+                    # Show timestamp below button
                     st.markdown(
-                        f'<div class="message-preview"><span class="role-badge">{role_icon} {role_label}</span><div class="preview-text">{preview}</div></div>',
+                        f'<div style="font-size: 0.7rem; color: #6b7280; margin-top: -8px; margin-bottom: 8px; padding-left: 8px;">{timestamp}</div>',
                         unsafe_allow_html=True
                     )
             else:
-                st.markdown('<div class="empty-state">No messages found</div>', unsafe_allow_html=True)
+                st.markdown('<div class="empty-state">No sessions found</div>', unsafe_allow_html=True)
         else:
-            # Show all messages
-            if total_messages > 0:
-                # Show recent messages (last 8)
-                recent_messages = st.session_state.get("messages", [])[-8:]
-                for idx, msg in enumerate(recent_messages):
-                    role_icon = "👤" if msg["role"] == "user" else "🤖"
-                    role_label = "You" if msg["role"] == "user" else "AI"
-                    preview = msg["content"][:55] + "..." if len(msg["content"]) > 55 else msg["content"]
+            # Show all chat sessions
+            if chat_sessions:
+                # Show recent sessions (max 10)
+                recent_sessions = chat_sessions[:10]
+                for session in recent_sessions:
+                    is_current = session["id"] == st.session_state.get("current_session_id")
+                    preview = get_session_preview(session)
+                    timestamp = session["created_at"].strftime("%m/%d %H:%M")
+
+                    # Create clickable session button
+                    button_key = f"session_{session['id']}"
+                    button_label = f"{'📍' if is_current else '💬'} {preview}"
+
+                    if st.button(button_label, key=button_key, use_container_width=True):
+                        if not is_current:
+                            switch_session(session["id"])
+                            st.rerun()
+
+                    # Show timestamp below button
                     st.markdown(
-                        f'<div class="message-preview"><span class="role-badge">{role_icon} {role_label}</span><div class="preview-text">{preview}</div></div>',
+                        f'<div style="font-size: 0.7rem; color: #6b7280; margin-top: -8px; margin-bottom: 8px; padding-left: 8px;">{timestamp}</div>',
                         unsafe_allow_html=True
                     )
-                if total_messages > 8:
-                    st.markdown(f'<div class="more-messages">+{total_messages - 8} more messages</div>', unsafe_allow_html=True)
+
+                if len(chat_sessions) > 10:
+                    st.markdown(f'<div class="more-messages">+{len(chat_sessions) - 10} more sessions</div>', unsafe_allow_html=True)
             else:
-                st.markdown('<div class="empty-state">💬 No messages yet<br><span style="font-size: 0.75rem; color: #6b7280;">Start a conversation!</span></div>', unsafe_allow_html=True)
+                st.markdown('<div class="empty-state">💬 No chats yet<br><span style="font-size: 0.75rem; color: #6b7280;">Start a conversation!</span></div>', unsafe_allow_html=True)
 
         st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
 
-        # Clear History Button - centered
-        if st.button("🗑️ Clear All", use_container_width=True, key="clear_btn"):
-            st.session_state.messages = []
-            if "conversation_id" in st.session_state:
-                del st.session_state.conversation_id
+        # Clear All Sessions Button
+        if st.button("🗑️ Clear All Sessions", use_container_width=True, key="clear_btn"):
+            st.session_state.chat_sessions = []
+            st.session_state.current_session_id = None
+            config = get_config()
+            create_new_session(config["ai_mode"])
             st.rerun()

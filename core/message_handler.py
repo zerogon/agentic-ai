@@ -3,6 +3,7 @@ import pandas as pd
 from databricks.sdk import WorkspaceClient
 from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
+from ui.session import update_current_session_messages
 
 
 def handle_chat_input(w: WorkspaceClient, config: dict):
@@ -17,6 +18,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
     if prompt := st.chat_input("Ask a question about your data..."):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # Update session history immediately after user message
+        update_current_session_messages()
 
         # Display user message
         with st.chat_message("user"):
@@ -97,6 +101,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     "role": "assistant",
                                     "content": msg["content"]
                                 })
+
+                        # Update session after all messages processed
+                        update_current_session_messages()
                     else:
                         error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
                         st.error(error_msg)
@@ -104,6 +111,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             "role": "assistant",
                             "content": error_msg
                         })
+                        update_current_session_messages()
 
             else:
                 # Mock mode (demo)
@@ -145,3 +153,6 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     "chart_data": fig,
                     "table_data": sample_data
                 })
+
+                # Update session after mock response
+                update_current_session_messages()
