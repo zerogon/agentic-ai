@@ -56,21 +56,56 @@ class DataHelper:
             if chart_type == "bar":
                 fig = px.bar(df, x=x_col, y=y_col, title=title)
             elif chart_type == "line":
-                # Line chart with support for multiple y columns
-                if isinstance(y_col, list):
-                    fig = px.line(df, x=x_col, y=y_col, title=title)
-                else:
-                    fig = px.line(df, x=x_col, y=y_col, title=title, markers=True)
+                # Use graph_objects instead of px.line to avoid WebGL
+                fig = go.Figure()
 
-                # Force stable SVG rendering to avoid WebGL issues
+                if isinstance(y_col, list):
+                    # Multiple lines
+                    for col in y_col:
+                        if col in df.columns:
+                            fig.add_trace(go.Scatter(
+                                x=df[x_col],
+                                y=df[col],
+                                mode='lines+markers',
+                                name=str(col),
+                                line=dict(width=2),
+                                marker=dict(size=4)
+                            ))
+                else:
+                    # Single line - ensure y_col exists
+                    if y_col and y_col in df.columns:
+                        fig.add_trace(go.Scatter(
+                            x=df[x_col],
+                            y=df[y_col],
+                            mode='lines+markers',
+                            name=str(y_col),
+                            line=dict(width=2),
+                            marker=dict(size=4)
+                        ))
+                    else:
+                        # Fallback: use first numeric column
+                        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                        if x_col in numeric_cols:
+                            numeric_cols.remove(x_col)
+                        if len(numeric_cols) > 0:
+                            y_col = numeric_cols[0]
+                            fig.add_trace(go.Scatter(
+                                x=df[x_col],
+                                y=df[y_col],
+                                mode='lines+markers',
+                                name=str(y_col),
+                                line=dict(width=2),
+                                marker=dict(size=4)
+                            ))
+
+                # Configure layout for stable SVG rendering
                 fig.update_layout(
-                    autosize=True,
+                    title=title,
+                    xaxis_title=str(x_col) if x_col else None,
+                    yaxis_title=str(y_col) if not isinstance(y_col, list) else None,
                     hovermode='closest',
-                    template='plotly'
-                )
-                fig.update_traces(
-                    line=dict(width=2),
-                    marker=dict(size=4)
+                    template='plotly',
+                    autosize=True
                 )
             elif chart_type == "pie":
                 fig = px.pie(df, names=x_col, values=y_col, title=title)
@@ -97,15 +132,22 @@ class DataHelper:
             return fig
 
         except Exception as e:
-            print(f"Error creating chart: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error creating {chart_type} chart: {e}")
+            print(f"Traceback: {error_details}")
+            print(f"DataFrame info - Shape: {df.shape}, Columns: {df.columns.tolist()}, x_col: {x_col}, y_col: {y_col}")
+
             # Fallback: try simple bar chart
             try:
                 if not x_col:
                     x_col = df.columns[0]
                 if not y_col:
                     y_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+                print(f"Falling back to bar chart with x={x_col}, y={y_col}")
                 return px.bar(df, x=x_col, y=y_col, title=title)
-            except:
+            except Exception as fallback_error:
+                print(f"Fallback bar chart also failed: {fallback_error}")
                 return None
 
     @staticmethod
