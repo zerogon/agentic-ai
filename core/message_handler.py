@@ -496,7 +496,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     genie = GenieHelper(w, selected_space_id)
 
                     # Create status container for progress
-                    status_container = st.status("Processing query...", expanded=True)
+                    status_container = st.status("Processing query...", expanded=False)
 
                     # Progress callback
                     progress_placeholder = st.empty()
@@ -520,8 +520,6 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Start new conversation
                             result = genie.start_conversation(prompt)
 
-                        status_container.update(label="Query complete!", state="complete")
-
                         if result["success"]:
                             # Store conversation ID (both legacy and new format)
                             st.session_state.conversation_id = result["conversation_id"]
@@ -530,6 +528,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                             # Process response
                             messages = genie.process_response(result["response"])
+
+                            # Update status to complete and expanded after successful processing
+                            status_container.update(label="Query complete!", state="complete", expanded=True)
 
                             for msg in messages:
                                 st.markdown(msg["content"])
@@ -559,9 +560,13 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         if fig:
                                             st.plotly_chart(fig, use_container_width=True)
 
-                                        # Show data table
-                                        st.markdown("**📋 Data:**")
-                                        st.dataframe(msg["data"], use_container_width=True)
+                                        # Show data table (skip for REGION_GENIE with map visualization)
+                                        is_region_genie = genie_domains and "REGION_GENIE" in genie_domains
+                                        is_map_chart = selected_chart == "map"
+
+                                        if not (is_region_genie and is_map_chart):
+                                            st.markdown("**📋 Data:**")
+                                            st.dataframe(msg["data"], use_container_width=True)
 
                                         # Add to chat history
                                         st.session_state.messages.append({
