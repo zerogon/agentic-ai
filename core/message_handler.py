@@ -178,7 +178,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         execution_plan = rationale.get("execution_plan", "")
 
                         if execution_plan:
-                            st.markdown("📋 **실행 계획**")
+                            st.markdown("📋 **Action Plan**")
 
                             # Create placeholder for streaming text
                             plan_container = st.empty()
@@ -193,11 +193,23 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                                 # Update display
                                 plan_container.markdown(displayed_text)
-                                time.sleep(0.05)  # Delay for typing effect
+                                time.sleep(0.1)  # Delay for typing effect
 
                         understanding = rationale.get("understanding", "")
                         if understanding:
-                            st.write(f"💡 {understanding}")
+                            # Stream understanding text
+                            st.markdown("💡 **Understanding**")
+                            understanding_container = st.empty()
+                            displayed_understanding = ""
+
+                            understanding_words = understanding.split()
+                            for i, word in enumerate(understanding_words):
+                                displayed_understanding += word
+                                if i < len(understanding_words) - 1:
+                                    displayed_understanding += " "
+
+                                understanding_container.markdown(displayed_understanding)
+                                time.sleep(0.1)
 
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]
@@ -269,18 +281,53 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         update_current_session_messages()
 
                     elif genie_domains:
+                        # Stream domain selection message
                         if is_multi_domain:
-                            st.caption(f"🎯 Using multiple Genies: {', '.join(genie_domains)}")
+                            domain_msg = f"🎯 Using multiple Genies: {', '.join(genie_domains)}"
                         else:
                             selected_domain = genie_domains[0]
                             selected_space_id = get_space_id_by_domain(selected_domain)
-                            st.caption(f"🎯 Using {selected_domain} for this query")
+                            domain_msg = f"🎯 Using {selected_domain} for this query"
 
-                        # Detailed routing analysis (for debugging)
+                        # Stream domain message
+                        domain_container = st.empty()
+                        displayed_domain = ""
+                        domain_words = domain_msg.split()
+                        for i, word in enumerate(domain_words):
+                            displayed_domain += word
+                            if i < len(domain_words) - 1:
+                                displayed_domain += " "
+                            domain_container.caption(displayed_domain)
+                            time.sleep(0.03)
+
+                        # Detailed routing analysis (for debugging) with streaming
                         with st.expander("🔍 Routing Details", expanded=False):
-                            st.write(f"**Intents:** {', '.join(routing_result['intents'])}")
-                            st.write(f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}")
-                            st.write(f"**Keywords:** {', '.join(routing_result['keywords'])}")
+                            # Stream intents
+                            intents_text = f"**Intents:** {', '.join(routing_result['intents'])}"
+                            intents_container = st.empty()
+                            displayed_intents = ""
+                            for char in intents_text:
+                                displayed_intents += char
+                                intents_container.markdown(displayed_intents)
+                                time.sleep(0.01)
+
+                            # Stream genie domains
+                            domains_text = f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}"
+                            domains_container = st.empty()
+                            displayed_domains = ""
+                            for char in domains_text:
+                                displayed_domains += char
+                                domains_container.markdown(displayed_domains)
+                                time.sleep(0.01)
+
+                            # Stream keywords
+                            keywords_text = f"**Keywords:** {', '.join(routing_result['keywords'])}"
+                            keywords_container = st.empty()
+                            displayed_keywords = ""
+                            for char in keywords_text:
+                                displayed_keywords += char
+                                keywords_container.markdown(displayed_keywords)
+                                time.sleep(0.01)
                     else:
                         selected_space_id = genie_space_id
                         st.warning("⚠️ No specific domain detected, using default Genie")
