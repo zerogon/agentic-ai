@@ -6,9 +6,85 @@ from databricks.sdk import WorkspaceClient
 from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
 from utils.route_helper import RouteHelper
+from utils.llm_helper import LLMHelper
 from ui.session import update_current_session_messages
 from core.config import get_space_id_by_domain
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None) -> dict:
+    """
+    Analyze data using LLM and generate insights.
+
+    Args:
+        w: WorkspaceClient instance
+        prompt: Original user query
+        data_list: List of dicts with {"domain": str, "data": DataFrame, "content": str}
+        llm_endpoint: LLM endpoint name (optional)
+
+    Returns:
+        dict: {"success": bool, "content": str, "error": str}
+    """
+    try:
+        # Prepare data summary for LLM
+        data_summary = f"Original Query: {prompt}\n\n"
+
+        for item in data_list:
+            domain = item.get("domain", "UNKNOWN")
+            df = item.get("data")
+            content = item.get("content", "")
+
+            if df is not None and not df.empty:
+                data_summary += f"--- {domain} ---\n"
+                if content:
+                    data_summary += f"Context: {content}\n"
+                data_summary += f"\nData Preview ({len(df)} rows):\n"
+                data_summary += df.head(10).to_string() + "\n\n"
+
+        # Call LLM for insight analysis
+        llm_helper = LLMHelper(workspace_client=w, provider="databricks")
+
+        analysis_messages = [
+            {
+                "role": "system",
+                "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
+            },
+            {
+                "role": "user",
+                "content": data_summary
+            }
+        ]
+
+        # Get LLM endpoint from secrets or use default
+        if not llm_endpoint:
+            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+
+        llm_result = llm_helper.chat_completion(
+            endpoint_name=llm_endpoint,
+            messages=analysis_messages,
+            temperature=0.3,
+            max_tokens=2000
+        )
+
+        if llm_result["success"]:
+            return {
+                "success": True,
+                "content": llm_result["content"],
+                "error": None
+            }
+        else:
+            return {
+                "success": False,
+                "content": None,
+                "error": llm_result.get("error", "Unknown error")
+            }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "content": None,
+            "error": str(e)
+        }
 
 
 def execute_genie_query(w: WorkspaceClient, space_id: str, domain: str, prompt: str, conversation_id: str = None):
@@ -126,6 +202,31 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]
 
+                    # Check if INSIGHT_REPORT intent is present
+                    needs_insight_report = "INSIGHT_REPORT" in routing_result.get("intents", [])
+
+                    # Check for previous data in message history
+                    has_previous_data = False
+                    previous_data_list = []
+
+                    if needs_insight_report:
+                        # Look for recent assistant messages with table_data
+                        for msg in reversed(st.session_state.messages):
+                            if msg.get("role") == "assistant" and msg.get("table_data") is not None:
+                                domain = msg.get("domain", "UNKNOWN")
+                                previous_data_list.append({
+                                    "domain": domain,
+                                    "data": msg.get("table_data"),
+                                    "content": msg.get("content", "")
+                                })
+
+                                # Stop after finding the most recent data-containing message(s)
+                                # If it's a multi-domain response, collect all from that exchange
+                                if len(previous_data_list) >= 2:
+                                    break
+
+                        has_previous_data = len(previous_data_list) > 0
+
                     # Detect multi-domain scenario (SALES_GENIE + CONTRACT_GENIE)
                     is_multi_domain = (
                         len(genie_domains) >= 2 and
@@ -133,7 +234,41 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         "CONTRACT_GENIE" in genie_domains
                     )
 
-                    if genie_domains:
+                    # Branch: Use previous data for INSIGHT_REPORT (no new Genie query)
+                    if needs_insight_report and has_previous_data and not genie_domains:
+                        st.caption("🔄 Analyzing previous query results...")
+
+                        # Display previous data info
+                        with st.expander("📊 Using Previous Data", expanded=False):
+                            for item in previous_data_list:
+                                st.write(f"**{item['domain']}**: {len(item['data'])} rows")
+
+                        # Analyze with LLM
+                        with st.spinner("🧠 Generating insights..."):
+                            llm_result = analyze_data_with_llm(w, prompt, previous_data_list)
+
+                            if llm_result["success"]:
+                                st.markdown("### 💡 LLM Insight Analysis")
+                                insight_text = llm_result["content"]
+                                st.markdown(insight_text)
+
+                                # Add to chat history
+                                st.session_state.messages.append({
+                                    "role": "assistant",
+                                    "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                })
+                            else:
+                                error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                                st.error(error_msg)
+                                st.session_state.messages.append({
+                                    "role": "assistant",
+                                    "content": error_msg
+                                })
+
+                        # Update session
+                        update_current_session_messages()
+
+                    elif genie_domains:
                         if is_multi_domain:
                             st.caption(f"🎯 Using multiple Genies: {', '.join(genie_domains)}")
                         else:
@@ -286,6 +421,71 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         # Clear temporary storage
                         del st.session_state.multi_genie_data
 
+                    # LLM Insight Analysis (if INSIGHT_REPORT intent detected)
+                    if needs_insight_report and "multi_genie_data" in locals():
+                        st.markdown("### 💡 LLM Insight Analysis")
+
+                        # Prepare data summary for LLM
+                        data_summary = f"Original Query: {prompt}\n\n"
+
+                        for domain, domain_result in genie_results.items():
+                            if domain_result["success"] and "result" in domain_result:
+                                data_summary += f"--- {domain} ---\n"
+                                result_data = domain_result["result"]
+
+                                # Add data preview (first 10 rows)
+                                if "response" in result_data:
+                                    genie = GenieHelper(w, get_space_id_by_domain(domain))
+                                    messages = genie.process_response(result_data["response"])
+
+                                    for msg in messages:
+                                        if msg.get("type") == "query" and not msg["data"].empty:
+                                            df = msg["data"]
+                                            data_summary += f"\nData Preview ({len(df)} rows):\n"
+                                            data_summary += df.head(10).to_string() + "\n\n"
+
+                        # Call LLM for insight analysis
+                        with st.spinner("🧠 Analyzing data with LLM..."):
+                            llm_helper = LLMHelper(workspace_client=w, provider="databricks")
+
+                            analysis_messages = [
+                                {
+                                    "role": "system",
+                                    "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": data_summary
+                                }
+                            ]
+
+                            # Get LLM endpoint from secrets or use default
+                            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+
+                            llm_result = llm_helper.chat_completion(
+                                endpoint_name=llm_endpoint,
+                                messages=analysis_messages,
+                                temperature=0.3,
+                                max_tokens=2000
+                            )
+
+                            if llm_result["success"]:
+                                insight_text = llm_result["content"]
+                                st.markdown(insight_text)
+
+                                # Add LLM insight to chat history
+                                st.session_state.messages.append({
+                                    "role": "assistant",
+                                    "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                })
+                            else:
+                                error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                                st.error(error_msg)
+                                st.session_state.messages.append({
+                                    "role": "assistant",
+                                    "content": error_msg
+                                })
+
                     # Update session after all messages processed
                     update_current_session_messages()
 
@@ -380,6 +580,61 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         "role": "assistant",
                                         "content": msg["content"]
                                     })
+
+                            # LLM Insight Analysis (if INSIGHT_REPORT intent detected)
+                            if needs_insight_report:
+                                st.markdown("### 💡 LLM Insight Analysis")
+
+                                # Prepare data summary for LLM
+                                data_summary = f"Original Query: {prompt}\n\n"
+
+                                for msg in messages:
+                                    if msg.get("type") == "query" and not msg["data"].empty:
+                                        df = msg["data"]
+                                        data_summary += f"Data Preview ({len(df)} rows):\n"
+                                        data_summary += df.head(10).to_string() + "\n\n"
+
+                                # Call LLM for insight analysis
+                                with st.spinner("🧠 Analyzing data with LLM..."):
+                                    llm_helper = LLMHelper(workspace_client=w, provider="databricks")
+
+                                    analysis_messages = [
+                                        {
+                                            "role": "system",
+                                            "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
+                                        },
+                                        {
+                                            "role": "user",
+                                            "content": data_summary
+                                        }
+                                    ]
+
+                                    # Get LLM endpoint from secrets or use default
+                                    llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+
+                                    llm_result = llm_helper.chat_completion(
+                                        endpoint_name=llm_endpoint,
+                                        messages=analysis_messages,
+                                        temperature=0.3,
+                                        max_tokens=2000
+                                    )
+
+                                    if llm_result["success"]:
+                                        insight_text = llm_result["content"]
+                                        st.markdown(insight_text)
+
+                                        # Add LLM insight to chat history
+                                        st.session_state.messages.append({
+                                            "role": "assistant",
+                                            "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                        })
+                                    else:
+                                        error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                                        st.error(error_msg)
+                                        st.session_state.messages.append({
+                                            "role": "assistant",
+                                            "content": error_msg
+                                        })
 
                             # Update session after all messages processed
                             update_current_session_messages()

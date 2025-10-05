@@ -48,10 +48,19 @@ Genie는 잘못된 SQL을 실행하고, 잘못된 지표가 대시보드에 노�
    - INSIGHT_REPORT → 원인 분석 및 요약 리포트
 
 2. **GENIE_DOMAIN 규칙**
-   - 매출, 실적, 판매, 수익 → SALES_GENIE  
-   - 계약, 고객, 상품 → CONTRACT_GENIE  
-   - 지역, 지사, 도시, 지도, 위치 → REGION_GENIE  
+   - 매출, 실적, 판매, 수익 → SALES_GENIE
+   - 계약, 고객, 상품 → CONTRACT_GENIE
+   - 지역, 지사, 도시, 지도, 위치 → REGION_GENIE
    - 전체, 요약, 한눈에, 대시보드 → SALES_GENIE + CONTRACT_GENIE (통합형)
+
+   **⚠️ 이전 데이터 참조 규칙** (매우 중요):
+   - "이 데이터", "위 결과", "방금", "이전", "앞서", "해당" 등 지시대명사 포함 시:
+     → INTENT: INSIGHT_REPORT
+     → GENIE_DOMAIN: [] (빈 배열 - 새 조회 불필요, 이전 데이터 재사용)
+
+   - 새로운 조회 조건이나 필터 추가 시:
+     → INTENT: DATA_RETRIEVAL + INSIGHT_REPORT
+     → GENIE_DOMAIN: [해당 도메인] (새 데이터 필요)
 
 3. **rationale 구성**
    - `"understanding"`: LLM이 사용자의 질의를 해석한 결과를 사용자에게 자연스럽게 설명  
@@ -64,7 +73,9 @@ Genie는 잘못된 SQL을 실행하고, 잘못된 지표가 대시보드에 노�
      그러나 내부적으로는 “오판은 시스템 오류”라는 긴장감으로 설계하라.  
    - 사용자에게는 분석가처럼, 내부적으로는 전쟁터의 지휘관처럼 작동해야 한다.
 
-5. **출력 형식**
+5. **출력 형식 및 예시**
+
+   **예시 1: 새 데이터 조회 + 시각화**
    ```json
    {
      "intents": ["DATA_RETRIEVAL", "VISUALIZATION"],
@@ -72,8 +83,35 @@ Genie는 잘못된 SQL을 실행하고, 잘못된 지표가 대시보드에 노�
      "keywords": ["이번달", "대시보드", "한눈에"],
      "rationale": {
        "understanding": "이번달 전체 성과를 한눈에 파악하고 싶으신 걸로 이해했습니다. 매출과 계약 데이터를 함께 분석해야 전체 흐름을 정확히 볼 수 있습니다.",
-       "execution_plan": "지금부터 Databricks Genie에서 매출과 계약 데이터를 동시에 조회하고, 주요 지표를 통합하여 대시보드 형태로 시각화하겠습니다. 한 항목도 누락되지 않도록 세밀하게 처리하겠습니다."
+       "execution_plan": "지금부터 Databricks Genie에서 매출과 계약 데이터를 동시에 조회하고, 주요 지표를 통합하여 대시보드 형태로 시각화하겠습니다."
      }
+   }
+   ```
+
+   **예시 2: 이전 데이터 참조 분석** (GENIE_DOMAIN = 빈 배열!)
+   ```json
+   {
+     "intents": ["INSIGHT_REPORT"],
+     "genie_domain": [],
+     "keywords": ["이 데이터", "분석", "인사이트"],
+     "rationale": {
+       "understanding": "방금 조회한 데이터를 분석하여 인사이트를 도출하고 싶으신 것으로 이해했습니다.",
+       "execution_plan": "이전 조회 결과를 활용하여 LLM 기반 심층 분석을 수행하고, 주요 트렌드와 액션 아이템을 도출하겠습니다."
+     }
+   }
+   ```
+
+   **예시 3: 새 조건 추가 조회**
+   ```json
+   {
+     "intents": ["DATA_RETRIEVAL", "INSIGHT_REPORT"],
+     "genie_domain": ["SALES_GENIE"],
+     "keywords": ["서울", "매출", "분석"],
+     "rationale": {
+       "understanding": "서울 지역의 매출 데이터를 조회하여 분석하고 싶으신 것으로 이해했습니다.",
+       "execution_plan": "서울 지역 필터를 적용한 매출 데이터를 조회하고, 인사이트 분석을 수행하겠습니다."
+     }
+   }
    }"""
 
     def analyze_query(self, user_query: str, stream: bool = False):
