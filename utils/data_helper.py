@@ -16,7 +16,8 @@ class DataHelper:
         chart_type: str,
         x_col: Optional[str] = None,
         y_col: Optional[str] = None,
-        title: Optional[str] = None
+        title: Optional[str] = None,
+        dark_mode: bool = False
     ):
         """
         Create a Plotly chart from DataFrame
@@ -118,6 +119,228 @@ class DataHelper:
                     fig = px.imshow(df[numeric_cols].corr(), title=title)
                 else:
                     fig = px.bar(df, x=x_col, y=y_col, title=title)
+            elif chart_type == "map":
+                # Map visualization with lat/lon coordinates
+                lat_col, lon_col, color_col = DataHelper._detect_map_columns(df)
+
+                if not lat_col or not lon_col:
+                    error_msg = f"❌ 지도 생성 실패: 위도/경도 컬럼을 찾을 수 없습니다."
+                    raise ValueError(error_msg)
+
+                # Convert coordinates to numeric (handles string/object dtypes)
+                df_map = df.copy()
+                df_map[lat_col] = pd.to_numeric(df_map[lat_col], errors='coerce')
+                df_map[lon_col] = pd.to_numeric(df_map[lon_col], errors='coerce')
+
+                # Remove rows with invalid coordinates
+                df_map = df_map.dropna(subset=[lat_col, lon_col])
+
+                if df_map.empty:
+                    raise ValueError("❌ 유효한 좌표 데이터가 없습니다.")
+
+                # Check if lat/lon are swapped (common issue)
+                lat_min, lat_max = df_map[lat_col].min(), df_map[lat_col].max()
+                lon_min, lon_max = df_map[lon_col].min(), df_map[lon_col].max()
+
+                # If latitude values are in longitude range and vice versa, swap them
+                lat_in_lon_range = (lat_min >= -180 and lat_max <= 180 and (lat_min < -90 or lat_max > 90))
+                lon_in_lat_range = (lon_min >= -90 and lon_max <= 90)
+
+                if lat_in_lon_range and lon_in_lat_range:
+                    # Swap the columns silently
+                    df_map[lat_col], df_map[lon_col] = df_map[lon_col].copy(), df_map[lat_col].copy()
+                    lat_min, lat_max = df_map[lat_col].min(), df_map[lat_col].max()
+                    lon_min, lon_max = df_map[lon_col].min(), df_map[lon_col].max()
+
+                # Validate coordinate ranges
+                if not DataHelper._validate_coordinates(df_map, lat_col, lon_col):
+                    raise ValueError(f"❌ 좌표 범위가 올바르지 않습니다.")
+
+                # Calculate center point
+                center_lat = (df_map[lat_col].min() + df_map[lat_col].max()) / 2
+                center_lon = (df_map[lon_col].min() + df_map[lon_col].max()) / 2
+
+                # Calculate appropriate zoom level based on coordinate range
+                lat_range = df_map[lat_col].max() - df_map[lat_col].min()
+                lon_range = df_map[lon_col].max() - df_map[lon_col].min()
+                max_range = max(lat_range, lon_range)
+
+                # Zoom level heuristic
+                if max_range > 10:
+                    zoom = 4
+                elif max_range > 5:
+                    zoom = 5
+                elif max_range > 2:
+                    zoom = 6
+                elif max_range > 1:
+                    zoom = 7
+                else:
+                    zoom = 8
+
+                # Try multiple map styles for best visual quality
+                try:
+                    # Create figure with size column if available
+                    size_col = None
+                    numeric_cols = df_map.select_dtypes(include=['number']).columns.tolist()
+                    # Remove lat/lon from numeric columns
+                    numeric_cols = [c for c in numeric_cols if c not in [lat_col, lon_col]]
+                    if len(numeric_cols) > 0:
+                        size_col = numeric_cols[0]  # Use first numeric column for size
+
+                    if True:  # Always use scatter_geo for reliability
+                        fig = px.scatter_geo(
+                            df_map,
+                            lat=lat_col,
+                            lon=lon_col,
+                            color=color_col if color_col else None,
+                            size=size_col if size_col else None,
+                            hover_name=color_col if color_col else None,
+                            hover_data={col: True for col in df_map.columns if col not in [lat_col, lon_col]},
+                            title=title if title else "📍 Geographic Distribution",
+                            projection="natural earth",
+                            color_continuous_scale="Plasma" if color_col and pd.api.types.is_numeric_dtype(df_map[color_col]) else None,
+                            color_discrete_sequence=px.colors.qualitative.Set2
+                        )
+
+                        # Calculate projection scale
+                        projection_scale = 100 / max_range if max_range > 0 else 20
+
+                        # Beautiful geo styling based on theme
+                        if dark_mode:
+                            # Elegant dark theme with gradient feel
+                            fig.update_geos(
+                                center=dict(lat=center_lat, lon=center_lon),
+                                projection_scale=projection_scale,
+                                visible=True,
+                                resolution=110,  # Higher resolution for smoother borders
+                                showcountries=True,
+                                countrycolor="#3B4252",
+                                countrywidth=1.5,
+                                showcoastlines=True,
+                                coastlinecolor="#4C566A",
+                                coastlinewidth=1,
+                                showland=True,
+                                landcolor="#2E3440",
+                                showocean=True,
+                                oceancolor="#1a1f2e",
+                                showlakes=True,
+                                lakecolor="#1a1f2e",
+                                showrivers=False,
+                                bgcolor="#1a1f2e"
+                            )
+                        else:
+                            # Clean, modern light theme
+                            fig.update_geos(
+                                center=dict(lat=center_lat, lon=center_lon),
+                                projection_scale=projection_scale,
+                                visible=True,
+                                resolution=110,  # Higher resolution
+                                showcountries=True,
+                                countrycolor="#CBD5E1",
+                                countrywidth=1.5,
+                                showcoastlines=True,
+                                coastlinecolor="#94A3B8",
+                                coastlinewidth=1,
+                                showland=True,
+                                landcolor="#F1F5F9",
+                                showocean=True,
+                                oceancolor="#E0F2FE",
+                                showlakes=True,
+                                lakecolor="#BAE6FD",
+                                showrivers=False,
+                                bgcolor="#F8FAFC"
+                            )
+
+                        # Subtle marker styling
+                        if size_col:
+                            fig.update_traces(
+                                marker=dict(
+                                    sizemode='diameter',
+                                    sizemin=4,
+                                    sizeref=2. * df_map[size_col].max() / (20.**2),
+                                    opacity=0.8,
+                                    line=dict(width=1, color='rgba(255,255,255,0.5)')
+                                )
+                            )
+                        else:
+                            fig.update_traces(
+                                marker=dict(
+                                    size=8,
+                                    opacity=0.8,
+                                    line=dict(width=1, color='rgba(255,255,255,0.5)')
+                                )
+                            )
+
+                    # Common layout styling with larger map size
+                    if dark_mode:
+                        fig.update_layout(
+                            template="plotly_dark",
+                            paper_bgcolor='#0F172A',
+                            plot_bgcolor='#0F172A',
+                            height=700,  # Increased from default
+                            font=dict(family="Inter, sans-serif", size=12, color="#E2E8F0"),
+                            title=dict(
+                                font=dict(size=20, family="Inter, sans-serif", color="#F1F5F9", weight=600),
+                                x=0.5,
+                                xanchor='center'
+                            ),
+                            legend=dict(
+                                orientation="v",
+                                yanchor="top",
+                                y=0.98,
+                                xanchor="right",
+                                x=0.98,
+                                bgcolor="rgba(15,23,42,0.85)",
+                                bordercolor="#475569",
+                                borderwidth=1,
+                                font=dict(color="#F1F5F9", size=11)
+                            ),
+                            hoverlabel=dict(
+                                bgcolor="#1E293B",
+                                font_size=12,
+                                font_family="Inter, sans-serif",
+                                font_color="#F1F5F9",
+                                bordercolor="#475569"
+                            ),
+                            margin=dict(l=0, r=0, t=40, b=0)  # Minimize margins for larger map area
+                        )
+                    else:
+                        fig.update_layout(
+                            paper_bgcolor='#FFFFFF',
+                            plot_bgcolor='#FFFFFF',
+                            height=700,  # Increased from default
+                            font=dict(family="Inter, sans-serif", size=12, color="#1F2937"),
+                            title=dict(
+                                font=dict(size=20, family="Inter, sans-serif", color="#111827", weight=600),
+                                x=0.5,
+                                xanchor='center'
+                            ),
+                            legend=dict(
+                                orientation="v",
+                                yanchor="top",
+                                y=0.98,
+                                xanchor="right",
+                                x=0.98,
+                                bgcolor="rgba(255,255,255,0.9)",
+                                bordercolor="#E5E7EB",
+                                borderwidth=1,
+                                font=dict(color="#1F2937", size=11)
+                            ),
+                            hoverlabel=dict(
+                                bgcolor="#FFFFFF",
+                                font_size=12,
+                                font_family="Inter, sans-serif",
+                                font_color="#1F2937",
+                                bordercolor="#D1D5DB"
+                            ),
+                            margin=dict(l=0, r=0, t=40, b=0)  # Minimize margins for larger map area
+                        )
+
+                except Exception as map_error:
+                    print(f"  ❌ All map creation methods failed: {map_error}")
+                    import traceback
+                    traceback.print_exc()
+                    raise ValueError(f"Failed to create map visualization: {map_error}")
             else:
                 # Default to bar chart
                 fig = px.bar(df, x=x_col, y=y_col, title=title)
@@ -164,23 +387,44 @@ class DataHelper:
         if df.empty:
             return "bar"
 
+        # Debug logging
+        print(f"🔍 Auto-detecting chart type for DataFrame:")
+        print(f"  - Columns: {df.columns.tolist()}")
+        print(f"  - Shape: {df.shape}")
+
+        # Check for map data first (latitude/longitude columns)
+        lat_col, lon_col, _ = DataHelper._detect_map_columns(df)
+        print(f"  - Map column detection: lat={lat_col}, lon={lon_col}")
+
+        if lat_col and lon_col:
+            # Validate coordinates
+            is_valid = DataHelper._validate_coordinates(df, lat_col, lon_col)
+            print(f"  - Coordinate validation: {is_valid}")
+            if is_valid:
+                print(f"✅ Auto-detected chart type: MAP")
+                return "map"
+
         # Count numeric vs categorical columns
         numeric_cols = df.select_dtypes(include=['number']).columns
         categorical_cols = df.select_dtypes(include=['object', 'category']).columns
 
         # If mostly numeric, use line or scatter
         if len(numeric_cols) >= 2:
+            print(f"✅ Auto-detected chart type: SCATTER (numeric columns: {len(numeric_cols)})")
             return "scatter"
 
         # If one categorical and one numeric, use bar
         if len(categorical_cols) >= 1 and len(numeric_cols) >= 1:
+            print(f"✅ Auto-detected chart type: BAR (categorical + numeric)")
             return "bar"
 
         # If mostly categorical, use bar
         if len(categorical_cols) > 0:
+            print(f"✅ Auto-detected chart type: BAR (categorical only)")
             return "bar"
 
         # Default
+        print(f"✅ Auto-detected chart type: BAR (default)")
         return "bar"
 
     @staticmethod
@@ -203,6 +447,125 @@ class DataHelper:
             formatted = formatted.replace(f" {keyword.lower()} ", f"\n{keyword} ")
 
         return formatted.strip()
+
+    @staticmethod
+    def _detect_map_columns(df: pd.DataFrame) -> tuple:
+        """
+        Auto-detect latitude, longitude, and category columns
+
+        Args:
+            df: Input DataFrame
+
+        Returns:
+            Tuple of (lat_col, lon_col, color_col)
+        """
+        lat_col = None
+        lon_col = None
+        color_col = None
+
+        # Detect latitude column (case-insensitive, including partial matches)
+        lat_candidates = ['latitude', 'lat', '위도', 'y', 'wido']
+        for col in df.columns:
+            col_lower = str(col).lower().strip()
+            # Check exact match or if candidate is in column name
+            if col_lower in lat_candidates or any(cand in col_lower for cand in lat_candidates):
+                lat_col = col
+                break
+
+        # Detect longitude column (case-insensitive, including partial matches)
+        lon_candidates = ['longitude', 'lon', 'lng', '경도', 'x', 'gyeongdo']
+        for col in df.columns:
+            col_lower = str(col).lower().strip()
+            # Check exact match or if candidate is in column name
+            if col_lower in lon_candidates or any(cand in col_lower for cand in lon_candidates):
+                lon_col = col
+                break
+
+        # Detect category/color column (case-insensitive, including partial matches)
+        category_candidates = ['category', 'type', 'group', 'class', '카테고리', '유형', 'region', 'area', '지역']
+        for col in df.columns:
+            col_lower = str(col).lower().strip()
+            # Check exact match or if candidate is in column name
+            if col_lower in category_candidates or any(cand in col_lower for cand in category_candidates):
+                color_col = col
+                break
+
+        # If no explicit category column, use first categorical column
+        if not color_col:
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            # Exclude lat/lon columns
+            categorical_cols = [c for c in categorical_cols if c not in [lat_col, lon_col]]
+            if len(categorical_cols) > 0:
+                color_col = categorical_cols[0]
+
+        return lat_col, lon_col, color_col
+
+    @staticmethod
+    def _validate_coordinates(df: pd.DataFrame, lat_col: str, lon_col: str) -> bool:
+        """
+        Validate latitude and longitude values
+
+        Args:
+            df: Input DataFrame
+            lat_col: Latitude column name
+            lon_col: Longitude column name
+
+        Returns:
+            True if coordinates are valid
+        """
+        try:
+            print(f"  🔍 Validating coordinates:")
+
+            # Check if columns exist
+            if lat_col not in df.columns or lon_col not in df.columns:
+                print(f"    ❌ Columns missing: lat_col={lat_col in df.columns}, lon_col={lon_col in df.columns}")
+                return False
+
+            # Show sample data
+            print(f"    - Sample {lat_col}: {df[lat_col].head(3).tolist()}")
+            print(f"    - Sample {lon_col}: {df[lon_col].head(3).tolist()}")
+            print(f"    - {lat_col} dtype: {df[lat_col].dtype}")
+            print(f"    - {lon_col} dtype: {df[lon_col].dtype}")
+
+            # Try to convert to numeric if needed
+            lat_series = pd.to_numeric(df[lat_col], errors='coerce')
+            lon_series = pd.to_numeric(df[lon_col], errors='coerce')
+
+            print(f"    - {lat_col} numeric dtype: {lat_series.dtype}")
+            print(f"    - {lon_col} numeric dtype: {lon_series.dtype}")
+
+            # Check for NaN values after conversion
+            lat_nan_count = lat_series.isna().sum()
+            lon_nan_count = lon_series.isna().sum()
+            print(f"    - {lat_col} NaN count: {lat_nan_count}/{len(df)}")
+            print(f"    - {lon_col} NaN count: {lon_nan_count}/{len(df)}")
+
+            if lat_nan_count > 0 or lon_nan_count > 0:
+                print(f"    ❌ Contains NaN values after conversion")
+                return False
+
+            # Check latitude range (-90 to 90)
+            lat_min, lat_max = lat_series.min(), lat_series.max()
+            print(f"    - {lat_col} range: {lat_min} to {lat_max}")
+            if lat_min < -90 or lat_max > 90:
+                print(f"    ❌ Latitude out of range (-90 to 90)")
+                return False
+
+            # Check longitude range (-180 to 180)
+            lon_min, lon_max = lon_series.min(), lon_series.max()
+            print(f"    - {lon_col} range: {lon_min} to {lon_max}")
+            if lon_min < -180 or lon_max > 180:
+                print(f"    ❌ Longitude out of range (-180 to 180)")
+                return False
+
+            print(f"    ✅ Coordinates are valid!")
+            return True
+
+        except Exception as e:
+            print(f"    ❌ Validation error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     @staticmethod
     def summarize_dataframe(df: pd.DataFrame) -> Dict:

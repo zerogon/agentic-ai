@@ -398,7 +398,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 sales_fig = data_helper.create_chart(
                                     sales_data,
                                     "line",
-                                    title="Sales Data"
+                                    title="Sales Data",
+                                    dark_mode=True
                                 )
                                 if sales_fig:
                                     st.plotly_chart(sales_fig, use_container_width=True)
@@ -412,7 +413,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 contract_fig = data_helper.create_chart(
                                     contract_data,
                                     "bar",
-                                    title="Contract Data"
+                                    title="Contract Data",
+                                    dark_mode=True
                                 )
                                 if contract_fig:
                                     st.plotly_chart(contract_fig, use_container_width=True)
@@ -550,7 +552,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         fig = data_helper.create_chart(
                                             msg["data"],
                                             selected_chart,
-                                            title="Query Results"
+                                            title="Query Results",
+                                            dark_mode=True
                                         )
 
                                         if fig:
@@ -671,7 +674,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 fig = data_helper.create_chart(
                     sample_data,
                     selected_chart,
-                    title="Sample Data Visualization"
+                    title="Sample Data Visualization",
+                    dark_mode=True
                 )
 
                 if fig:

@@ -20,7 +20,7 @@ class RouteHelper:
             base_url=f"{self.databricks_host}/serving-endpoints"
         )
 
-        self.model_name = "databricks-claude-3-7-sonnet"
+        self.model_name = "databricks-meta-llama-3-3-70b-instruct"
 
         # System prompt for routing model
         self.system_prompt = """<role>
