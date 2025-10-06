@@ -11,6 +11,51 @@ from typing import Optional, Dict
 
 class DataHelper:
     @staticmethod
+    def _smart_sort_dataframe(df: pd.DataFrame, sort_column: str) -> pd.DataFrame:
+        """
+        Smart sort DataFrame by detecting column type and sorting appropriately
+        Handles numeric strings, dates, and regular strings
+
+        Args:
+            df: Input DataFrame
+            sort_column: Column name to sort by
+
+        Returns:
+            Sorted DataFrame
+        """
+        if sort_column not in df.columns:
+            return df
+
+        df_copy = df.copy()
+
+        # Try numeric conversion first (handles "1", "2", "10" correctly)
+        try:
+            numeric_values = pd.to_numeric(df_copy[sort_column], errors='coerce')
+            # Check if at least some values were successfully converted
+            if not numeric_values.isna().all() and numeric_values.notna().sum() > 0:
+                # Create temporary sort key
+                df_copy['_sort_key'] = numeric_values
+                # Sort by numeric values, putting NaN at the end
+                df_sorted = df_copy.sort_values('_sort_key', na_position='last').drop('_sort_key', axis=1)
+                return df_sorted
+        except Exception:
+            pass
+
+        # Try datetime conversion (handles dates/times)
+        try:
+            datetime_values = pd.to_datetime(df_copy[sort_column], errors='coerce')
+            # Check if at least some values were successfully converted
+            if not datetime_values.isna().all() and datetime_values.notna().sum() > 0:
+                df_copy['_sort_key'] = datetime_values
+                df_sorted = df_copy.sort_values('_sort_key', na_position='last').drop('_sort_key', axis=1)
+                return df_sorted
+        except Exception:
+            pass
+
+        # Fallback to string sorting
+        return df_copy.sort_values(sort_column)
+
+    @staticmethod
     def create_chart(
         df: pd.DataFrame,
         chart_type: str,
@@ -57,16 +102,19 @@ class DataHelper:
             if chart_type == "bar":
                 fig = px.bar(df, x=x_col, y=y_col, title=title)
             elif chart_type == "line":
+                # Smart sort DataFrame by x-axis column (handles numeric strings, dates, etc.)
+                df_sorted = DataHelper._smart_sort_dataframe(df, x_col)
+
                 # Use graph_objects instead of px.line to avoid WebGL
                 fig = go.Figure()
 
                 if isinstance(y_col, list):
                     # Multiple lines
                     for col in y_col:
-                        if col in df.columns:
+                        if col in df_sorted.columns:
                             fig.add_trace(go.Scatter(
-                                x=df[x_col],
-                                y=df[col],
+                                x=df_sorted[x_col],
+                                y=df_sorted[col],
                                 mode='lines+markers',
                                 name=str(col),
                                 line=dict(width=2),
@@ -74,10 +122,10 @@ class DataHelper:
                             ))
                 else:
                     # Single line - ensure y_col exists
-                    if y_col and y_col in df.columns:
+                    if y_col and y_col in df_sorted.columns:
                         fig.add_trace(go.Scatter(
-                            x=df[x_col],
-                            y=df[y_col],
+                            x=df_sorted[x_col],
+                            y=df_sorted[y_col],
                             mode='lines+markers',
                             name=str(y_col),
                             line=dict(width=2),
@@ -85,14 +133,14 @@ class DataHelper:
                         ))
                     else:
                         # Fallback: use first numeric column
-                        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                        numeric_cols = df_sorted.select_dtypes(include=['number']).columns.tolist()
                         if x_col in numeric_cols:
                             numeric_cols.remove(x_col)
                         if len(numeric_cols) > 0:
                             y_col = numeric_cols[0]
                             fig.add_trace(go.Scatter(
-                                x=df[x_col],
-                                y=df[y_col],
+                                x=df_sorted[x_col],
+                                y=df_sorted[y_col],
                                 mode='lines+markers',
                                 name=str(y_col),
                                 line=dict(width=2),
@@ -107,6 +155,17 @@ class DataHelper:
                     hovermode='closest',
                     template='plotly',
                     autosize=True
+                )
+
+                # Configure X-axis: sort categories if categorical
+                if df_sorted[x_col].dtype == 'object' or df_sorted[x_col].dtype.name == 'category':
+                    fig.update_xaxes(categoryorder='array', categoryarray=df_sorted[x_col].unique())
+
+                # Configure Y-axis: ensure it's treated as numeric/continuous
+                fig.update_yaxes(
+                    type='linear',  # Force linear numeric scale
+                    autorange=True,  # Auto-scale based on data
+                    rangemode='tozero'  # Start from zero if appropriate
                 )
             elif chart_type == "pie":
                 fig = px.pie(df, names=x_col, values=y_col, title=title)
