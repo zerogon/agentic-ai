@@ -12,18 +12,19 @@ from core.config import get_space_id_by_domain
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None) -> dict:
+def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None, stream_container=None):
     """
-    Analyze data using LLM and generate insights.
+    Analyze data using LLM and generate insights with streaming support.
 
     Args:
         w: WorkspaceClient instance
         prompt: Original user query
         data_list: List of dicts with {"domain": str, "data": DataFrame, "content": str}
         llm_endpoint: LLM endpoint name (optional)
+        stream_container: Streamlit container for streaming display (optional)
 
     Returns:
-        dict: {"success": bool, "content": str, "error": str}
+        Dict with success, content, and error keys
     """
     try:
         # Prepare data summary for LLM
@@ -59,25 +60,45 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
         if not llm_endpoint:
             llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
 
-        llm_result = llm_helper.chat_completion(
-            endpoint_name=llm_endpoint,
-            messages=analysis_messages,
-            temperature=0.3,
-            max_tokens=2000
-        )
+        # Use streaming if container provided
+        if stream_container:
+            full_response = ""
+            for chunk in llm_helper.chat_completion_stream(
+                endpoint_name=llm_endpoint,
+                messages=analysis_messages,
+                temperature=0.3,
+                max_tokens=2000
+            ):
+                full_response += chunk
+                stream_container.markdown(full_response)
 
-        if llm_result["success"]:
+            # Return final response after streaming completes
             return {
                 "success": True,
-                "content": llm_result["content"],
+                "content": full_response,
                 "error": None
             }
         else:
-            return {
-                "success": False,
-                "content": None,
-                "error": llm_result.get("error", "Unknown error")
-            }
+            # Non-streaming fallback
+            llm_result = llm_helper.chat_completion(
+                endpoint_name=llm_endpoint,
+                messages=analysis_messages,
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            if llm_result["success"]:
+                return {
+                    "success": True,
+                    "content": llm_result["content"],
+                    "error": None
+                }
+            else:
+                return {
+                    "success": False,
+                    "content": None,
+                    "error": llm_result.get("error", "Unknown error")
+                }
 
     except Exception as e:
         return {
@@ -255,27 +276,28 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             for item in previous_data_list:
                                 st.write(f"**{item['domain']}**: {len(item['data'])} rows")
 
-                        # Analyze with LLM
-                        with st.spinner("🧠 Generating insights..."):
-                            llm_result = analyze_data_with_llm(w, prompt, previous_data_list)
+                        # Analyze with LLM (streaming)
+                        st.markdown("### 💡 LLM Insight Analysis")
+                        insight_container = st.empty()
 
-                            if llm_result["success"]:
-                                st.markdown("### 💡 LLM Insight Analysis")
-                                insight_text = llm_result["content"]
-                                st.markdown(insight_text)
+                        # Stream LLM analysis and get result
+                        llm_result = analyze_data_with_llm(w, prompt, previous_data_list, stream_container=insight_container)
 
-                                # Add to chat history
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
-                                })
-                            else:
-                                error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
-                                st.error(error_msg)
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": error_msg
-                                })
+                        if llm_result["success"]:
+                            insight_text = llm_result["content"]
+
+                            # Add to chat history
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                            })
+                        else:
+                            error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                            st.error(error_msg)
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": error_msg
+                            })
 
                         # Update session
                         update_current_session_messages()
@@ -471,69 +493,52 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         del st.session_state.multi_genie_data
 
                     # LLM Insight Analysis (if INSIGHT_REPORT intent detected)
-                    if needs_insight_report and "multi_genie_data" in locals():
+                    if needs_insight_report and genie_results:
                         st.markdown("### 💡 LLM Insight Analysis")
 
-                        # Prepare data summary for LLM
-                        data_summary = f"Original Query: {prompt}\n\n"
-
+                        # Prepare data list for LLM
+                        data_list = []
                         for domain, domain_result in genie_results.items():
                             if domain_result["success"] and "result" in domain_result:
-                                data_summary += f"--- {domain} ---\n"
                                 result_data = domain_result["result"]
 
-                                # Add data preview (first 10 rows)
+                                # Extract data from response
                                 if "response" in result_data:
                                     genie = GenieHelper(w, get_space_id_by_domain(domain))
                                     messages = genie.process_response(result_data["response"])
 
                                     for msg in messages:
                                         if msg.get("type") == "query" and not msg["data"].empty:
-                                            df = msg["data"]
-                                            data_summary += f"\nData Preview ({len(df)} rows):\n"
-                                            data_summary += df.head(10).to_string() + "\n\n"
+                                            data_list.append({
+                                                "domain": domain,
+                                                "data": msg["data"],
+                                                "content": msg.get("content", "")
+                                            })
 
-                        # Call LLM for insight analysis
-                        with st.spinner("🧠 Analyzing data with LLM..."):
-                            llm_helper = LLMHelper(workspace_client=w, provider="databricks")
+                        # Stream LLM analysis
+                        insight_container = st.empty()
 
-                            analysis_messages = [
-                                {
-                                    "role": "system",
-                                    "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
-                                },
-                                {
-                                    "role": "user",
-                                    "content": data_summary
-                                }
-                            ]
+                        # Get LLM endpoint
+                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
 
-                            # Get LLM endpoint from secrets or use default
-                            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+                        # Stream and get final result
+                        llm_result = analyze_data_with_llm(w, prompt, data_list, llm_endpoint, stream_container=insight_container)
 
-                            llm_result = llm_helper.chat_completion(
-                                endpoint_name=llm_endpoint,
-                                messages=analysis_messages,
-                                temperature=0.3,
-                                max_tokens=2000
-                            )
+                        if llm_result["success"]:
+                            insight_text = llm_result["content"]
 
-                            if llm_result["success"]:
-                                insight_text = llm_result["content"]
-                                st.markdown(insight_text)
-
-                                # Add LLM insight to chat history
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
-                                })
-                            else:
-                                error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
-                                st.error(error_msg)
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": error_msg
-                                })
+                            # Add LLM insight to chat history
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                            })
+                        else:
+                            error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                            st.error(error_msg)
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": error_msg
+                            })
 
                     # Update session after all messages processed
                     update_current_session_messages()
@@ -640,56 +645,40 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             if needs_insight_report:
                                 st.markdown("### 💡 LLM Insight Analysis")
 
-                                # Prepare data summary for LLM
-                                data_summary = f"Original Query: {prompt}\n\n"
-
+                                # Prepare data list for LLM
+                                data_list = []
                                 for msg in messages:
                                     if msg.get("type") == "query" and not msg["data"].empty:
-                                        df = msg["data"]
-                                        data_summary += f"Data Preview ({len(df)} rows):\n"
-                                        data_summary += df.head(10).to_string() + "\n\n"
-
-                                # Call LLM for insight analysis
-                                with st.spinner("🧠 Analyzing data with LLM..."):
-                                    llm_helper = LLMHelper(workspace_client=w, provider="databricks")
-
-                                    analysis_messages = [
-                                        {
-                                            "role": "system",
-                                            "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
-                                        },
-                                        {
-                                            "role": "user",
-                                            "content": data_summary
-                                        }
-                                    ]
-
-                                    # Get LLM endpoint from secrets or use default
-                                    llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
-
-                                    llm_result = llm_helper.chat_completion(
-                                        endpoint_name=llm_endpoint,
-                                        messages=analysis_messages,
-                                        temperature=0.3,
-                                        max_tokens=2000
-                                    )
-
-                                    if llm_result["success"]:
-                                        insight_text = llm_result["content"]
-                                        st.markdown(insight_text)
-
-                                        # Add LLM insight to chat history
-                                        st.session_state.messages.append({
-                                            "role": "assistant",
-                                            "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                        data_list.append({
+                                            "domain": "SINGLE_DOMAIN",
+                                            "data": msg["data"],
+                                            "content": msg.get("content", "")
                                         })
-                                    else:
-                                        error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
-                                        st.error(error_msg)
-                                        st.session_state.messages.append({
-                                            "role": "assistant",
-                                            "content": error_msg
-                                        })
+
+                                # Stream LLM analysis
+                                insight_container = st.empty()
+
+                                # Get LLM endpoint
+                                llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+
+                                # Stream and get final result
+                                llm_result = analyze_data_with_llm(w, prompt, data_list, llm_endpoint, stream_container=insight_container)
+
+                                if llm_result["success"]:
+                                    insight_text = llm_result["content"]
+
+                                    # Add LLM insight to chat history
+                                    st.session_state.messages.append({
+                                        "role": "assistant",
+                                        "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                    })
+                                else:
+                                    error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                                    st.error(error_msg)
+                                    st.session_state.messages.append({
+                                        "role": "assistant",
+                                        "content": error_msg
+                                    })
 
                             # Update session after all messages processed
                             update_current_session_messages()

@@ -170,6 +170,54 @@ class LLMHelper:
             }
         ]
 
+    def chat_completion_stream(
+        self,
+        endpoint_name: str,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None
+    ):
+        """
+        Stream chat completion responses (Databricks only)
+
+        Args:
+            endpoint_name: Name of the serving endpoint
+            messages: List of message dicts with 'role' and 'content'
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+
+        Yields:
+            Text chunks as they arrive
+        """
+        try:
+            # Get OpenAI-compatible client from Databricks SDK
+            client = self.w.serving_endpoints.get_open_ai_client()
+
+            # Convert messages to OpenAI format
+            openai_messages = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in messages
+            ]
+
+            # Create streaming completion
+            stream = client.chat.completions.create(
+                model=endpoint_name,
+                messages=openai_messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True
+            )
+
+            # Yield chunks as they arrive
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        yield delta.content
+
+        except Exception as e:
+            yield f"Error during streaming: {str(e)}"
+
     def _extract_content(self, response: Dict) -> Optional[str]:
         """
         Extract text content from various response formats
