@@ -416,11 +416,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 st.markdown(msg["content"])
 
                                 if msg.get("type") == "query":
-                                    # Show SQL code
+                                    # Show SQL code (without expander to avoid nesting)
                                     if msg.get("code"):
-                                        with st.expander(f"Show generated SQL ({domain})"):
-                                            formatted_sql = data_helper.format_sql_code(msg["code"])
-                                            st.code(formatted_sql, language="sql")
+                                        st.caption(f"📝 Generated SQL ({domain}):")
+                                        formatted_sql = data_helper.format_sql_code(msg["code"])
+                                        st.code(formatted_sql, language="sql")
 
                                     # Store data for visualization
                                     if not msg["data"].empty:
@@ -595,11 +595,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 st.markdown(msg["content"])
 
                                 if msg.get("type") == "query":
-                                    # Show SQL code
+                                    # Show SQL code (without expander to avoid nesting)
                                     if msg.get("code"):
-                                        with st.expander("Show generated SQL"):
-                                            formatted_sql = data_helper.format_sql_code(msg["code"])
-                                            st.code(formatted_sql, language="sql")
+                                        st.caption("📝 Generated SQL:")
+                                        formatted_sql = data_helper.format_sql_code(msg["code"])
+                                        st.code(formatted_sql, language="sql")
 
                                     # Show data and visualization
                                     if not msg["data"].empty:

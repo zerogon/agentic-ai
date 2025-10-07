@@ -10,8 +10,12 @@ def init_databricks_client():
     os.environ.pop("DATABRICKS_CLIENT_ID", None)
     os.environ.pop("DATABRICKS_CLIENT_SECRET", None)
 
-    host = st.secrets["databricks"]["HOST"]
-    token = st.secrets["databricks"]["TOKEN"]
+    # Try secrets first, fallback to environment variables
+    host = st.secrets.get("databricks", {}).get("HOST") or os.environ.get("DATABRICKS_HOST")
+    token = st.secrets.get("databricks", {}).get("TOKEN") or os.environ.get("DATABRICKS_TOKEN")
+
+    if not host or not token:
+        raise ValueError("Databricks HOST and TOKEN must be set in secrets.toml or environment variables")
 
     conf = Config(host=host, token=token)
     w = WorkspaceClient(config=conf)

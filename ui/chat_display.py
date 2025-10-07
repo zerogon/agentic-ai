@@ -7,10 +7,10 @@ def display_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-            # Display SQL code if present
+            # Display SQL code if present (without expander to avoid nesting)
             if "code" in message and message["code"]:
-                with st.expander("Show generated SQL"):
-                    st.code(message["code"], language="sql")
+                st.caption("📝 Generated SQL:")
+                st.code(message["code"], language="sql")
 
             # Display visualization if present
             if "chart_data" in message:
