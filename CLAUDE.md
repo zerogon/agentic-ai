@@ -39,24 +39,39 @@ All business logic is in `utils/` as standalone helper classes:
    - Supports **two providers**: `databricks`
    - Single unified interface: `chat_completion()` works for both
    - Provider switching via `provider` parameter in constructor
-   - **Important**: For Databricks provider, pass `WorkspaceClient`; 
+   - **Important**: For Databricks provider, pass `WorkspaceClient`
 
 3. **`data_helper.py`**: Visualization and data processing
    - `create_chart()` - Generate Plotly charts from DataFrames
    - `auto_detect_chart_type()` - Smart chart type selection
    - `format_sql_code()` - SQL formatting for display
 
-5. **`report_helper.py`**: Report generation
-   - `generate_pdf()` - ReportLab-based PDF reports
+4. **`route_helper.py`**: Multi-Genie routing and domain selection
+   - `extract_keywords()` - Extract query keywords for routing
+   - `determine_genie_domain()` - Determine best Genie Space based on query
+   - Supports multiple Genie Spaces: SALES_GENIE, CONTRACT_GENIE, REGION_GENIE
+
+5. **`report_helper.py`**: Report generation (PDF/HTML)
+   - `generate_pdf()` - ReportLab-based PDF reports with Korean font support
    - `generate_html()` - Jinja2-based HTML reports
    - Accumulate sections with `add_section()`, `add_dataframe()`, `add_chart()`
+   - Korean font handling: AppleSDGothicNeo.ttc → AppleGothic.ttf → Helvetica
    - Call `clear()` before building new report
+
+6. **`report_generator.py`**: Business report generation from chat sessions
+   - `generate_business_report()` - Generate comprehensive business analysis report
+   - `_extract_conversation_data()` - Extract queries, domains, data samples from messages
+   - `_generate_llm_analysis()` - LLM-based business insights in Korean
+   - `generate_report_preview()` - Preview statistics before generation
 
 ### State Management
 
 **Session state keys** (in `st.session_state`):
-- `messages` - Chat history (list of dicts with role/content/chart_data/table_data)
+- `messages` - Chat history (list of dicts with role/content/chart_data/table_data/code/domain)
 - `conversation_id` - Genie conversation ID for multi-turn queries
+- `chat_sessions` - List of all chat sessions with metadata
+- `current_session_id` - Active session identifier
+- `generated_report` - Cached business report data (PDF and HTML bytes)
 
 ## Development Commands
 
@@ -85,18 +100,25 @@ databricks apps deploy <app-name> --source-code-path .
 
 ## Working with AI Modes
 
-The app supports **4 AI modes** (selected via sidebar):
+The app supports **AI mode** via Genie API:
 
-### 1. Genie API
+### Genie API (Multi-Space Routing)
 - Best for: Data queries (NL2SQL)
 - Requires: `GENIE_SPACE_ID` in secrets or sidebar input
-- Flow: User query → Genie generates SQL → Executes → Returns DataFrame
+- Supports multiple Genie Spaces with intelligent routing:
+  - **SALES_GENIE**: Sales data queries
+  - **CONTRACT_GENIE**: Contract and legal data
+  - **REGION_GENIE**: Regional and geographic data
+- Flow: User query → Route to appropriate Genie Space → Generate SQL → Execute → Return DataFrame
 - Maintains conversation context automatically
+- Routing: `route_helper.py` determines best Genie Space based on query keywords
 
 ## Report Generation
 
-### Building Reports
+### 1. Manual Report Building (Low-level API)
 ```python
+from utils.report_helper import ReportHelper
+
 report = ReportHelper()
 
 # Add content
@@ -112,7 +134,39 @@ html_str = report.generate_html(title="Report", author="User")
 report.clear()
 ```
 
-**In app.py**: Report is built from `st.session_state.messages` by iterating over assistant messages and adding their content/tables/charts.
+### 2. Business Report Generation (High-level API)
+```python
+from utils.report_generator import generate_business_report
+from core.config import init_databricks_client
+
+w = init_databricks_client()
+messages = st.session_state.get("messages", [])
+
+result = generate_business_report(
+    w=w,
+    messages=messages,
+    title="Business Analysis Report",
+    author="Databricks Data Chat"
+)
+
+if result["success"]:
+    pdf_bytes = result["pdf"]
+    html_string = result["html"]
+else:
+    error = result["error"]
+```
+
+**Features**:
+- Extracts all queries, data, and charts from chat session
+- Generates LLM-based business insights in Korean
+- Creates structured report with:
+  - Executive Summary (경영진 요약)
+  - Analysis Details (분석 상세)
+  - Key Insights (주요 인사이트)
+  - Business Recommendations (비즈니스 권장사항)
+  - Conclusion (결론)
+- Supports Korean text in PDF with proper font handling
+- Available in sidebar: "📊 Reports" section with preview and download buttons
 
 ## Adding New Features
 
@@ -158,6 +212,8 @@ report.clear()
    - PDF requires kaleido for Plotly image export
    - HTML embeds Plotly.js (large file size)
    - Tables truncated to 50 rows in PDF
+   - Korean font support requires macOS system fonts (AppleSDGothicNeo.ttc or AppleGothic.ttf)
+   - Report data persists in `st.session_state.generated_report` for download button stability
 
 
 ## Configuration Files
@@ -213,13 +269,31 @@ python examples/report_example.py
 **Problem**: Image export errors or kaleido issues
 **Solution**: `pip install kaleido==0.2.1` (specific version required)
 
+### Korean Text Broken in PDF
+**Problem**: Korean characters appear as boxes or garbled text
+**Solution**: Ensure macOS system fonts are accessible:
+- AppleSDGothicNeo.ttc at `/System/Library/Fonts/AppleSDGothicNeo.ttc`
+- AppleGothic.ttf at `/System/Library/Fonts/AppleGothic.ttf`
+- ReportLab TTFont registration handles font loading automatically
+
+### Download Buttons Disappear After Click
+**Problem**: After clicking PDF download, HTML download button disappears
+**Solution**: Report data is now persisted in `st.session_state.generated_report`
+- Download buttons remain visible after any download
+- Click "🔄 Generate New Report" to regenerate
+
 ## File References
 
 When discussing code locations, use these patterns:
-- `app.py:50` - Sidebar configuration starts here
+- `app.py:45` - Chat input handling
+- `ui/sidebar.py:104` - Report generation UI section
 - `utils/genie_helper.py:101` - Response processing logic
 - `utils/llm_helper.py:13` - Multi-provider constructor
-- `utils/report_helper.py:85` - PDF generation method
+- `utils/report_helper.py:68` - PDF generation method with Korean font support
+- `utils/report_generator.py:15` - Business report generation
+- `utils/route_helper.py:10` - Multi-Genie routing logic
+- `core/config.py:31` - Genie Space configuration
+- `core/message_handler.py` - Chat message processing
 
 ## Documentation
 
@@ -230,7 +304,37 @@ When discussing code locations, use these patterns:
 ## Key Learnings for New Features
 
 1. **Always use helpers**: Don't put business logic directly in `app.py`
-2. **Preserve message structure**: Include all optional fields (code, chart_data, table_data)
+2. **Preserve message structure**: Include all optional fields (code, chart_data, table_data, domain)
 3. **Handle both success and error cases**: Return `{"success": bool, "content": str, "error": str}`
 4. **Test locally before deploying**: Use mock mode or local credentials
 5. **Remember single-process constraint**: No background workers, no separate API servers
+6. **Session state persistence**: Use `st.session_state` for data that must survive reruns (e.g., generated reports)
+7. **Korean text support**: Register Korean fonts in ReportLab for PDF generation
+8. **Multi-Genie routing**: Use `route_helper.py` to determine appropriate Genie Space based on query keywords
+9. **Message structure for reports**: Extract conversation data from `messages` list with proper filtering of queries and data
+
+## UI Components
+
+### Main Components
+- **`ui/sidebar.py`**: Sidebar with chat history, search, and report generation
+- **`ui/chat_display.py`**: Message display with code, tables, and charts
+- **`ui/session.py`**: Session state initialization and management
+- **`ui/styles.py`**: Custom CSS styling
+
+### Core Logic
+- **`core/config.py`**: Databricks client initialization and configuration
+- **`core/message_handler.py`**: Chat input processing and response handling
+
+## Recent Additions
+
+### Business Report Generation (2024)
+- **Purpose**: Generate comprehensive business analysis reports from chat sessions
+- **Implementation**: `utils/report_generator.py` + sidebar UI integration
+- **Features**:
+  - LLM-based business insights in Korean
+  - Structured report with executive summary, analysis, insights, recommendations
+  - PDF/HTML export with Korean font support
+  - Session state persistence for stable download buttons
+- **Known Issues Fixed**:
+  - Korean text encoding in PDF (resolved with TTFont registration)
+  - Download button disappearance (resolved with session state caching)

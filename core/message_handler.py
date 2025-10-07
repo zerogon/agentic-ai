@@ -127,7 +127,17 @@ def execute_genie_query(w: WorkspaceClient, space_id: str, domain: str, prompt: 
 
         if conversation_id:
             # Continue existing conversation
-            result = genie.continue_conversation(conversation_id, prompt)
+            try:
+                result = genie.continue_conversation(conversation_id, prompt)
+            except Exception as conv_error:
+                # If conversation continuation fails (e.g., wrong owner), start new conversation
+                error_msg = str(conv_error)
+                if "does not own conversation" in error_msg:
+                    # Invalid conversation ID - start new conversation instead
+                    result = genie.start_conversation(prompt)
+                else:
+                    # Re-raise other errors
+                    raise
         else:
             # Start new conversation
             result = genie.start_conversation(prompt)
@@ -558,18 +568,15 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     genie.set_progress_callback(update_progress)
 
                     with status_container:
-                        # Get conversation ID from dict or legacy single ID
-                        conv_id = None
-                        if genie_domains and len(genie_domains) > 0:
-                            conv_id = st.session_state.conversation_ids.get(genie_domains[0])
-                        if not conv_id:
-                            conv_id = st.session_state.conversation_id
+                        # Get conversation ID - use domain-specific ID only (no legacy fallback)
+                        current_domain = genie_domains[0] if genie_domains and len(genie_domains) > 0 else None
+                        conv_id = st.session_state.conversation_ids.get(current_domain) if current_domain else None
 
                         if conv_id:
-                            # Continue conversation
+                            # Continue conversation with domain-specific ID
                             result = genie.continue_conversation(conv_id, prompt)
                         else:
-                            # Start new conversation
+                            # Start new conversation (no conversation ID exists for this domain)
                             result = genie.start_conversation(prompt)
 
                         if result["success"]:
