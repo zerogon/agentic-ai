@@ -89,8 +89,24 @@ class ReportHelper:
             from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
             from reportlab.lib import colors
             from reportlab.lib.enums import TA_CENTER, TA_LEFT
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.ttfonts import TTFont
         except ImportError:
             raise ImportError("ReportLab is required for PDF generation. Install with: pip install reportlab")
+
+        # Register Korean font (NanumGothic)
+        try:
+            # Try to register NanumGothic font (common Korean font)
+            pdfmetrics.registerFont(TTFont('NanumGothic', '/System/Library/Fonts/AppleSDGothicNeo.ttc', subfontIndex=0))
+            korean_font = 'NanumGothic'
+        except:
+            try:
+                # Fallback to macOS system fonts
+                pdfmetrics.registerFont(TTFont('AppleGothic', '/System/Library/Fonts/AppleGothic.ttf'))
+                korean_font = 'AppleGothic'
+            except:
+                # If no Korean font available, use Helvetica (will show boxes for Korean)
+                korean_font = 'Helvetica'
 
         # Create PDF buffer
         buffer = io.BytesIO()
@@ -108,11 +124,12 @@ class ReportHelper:
         # Container for the 'Flowable' objects
         elements = []
 
-        # Define styles
+        # Define styles with Korean font support
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
+            fontName=korean_font,
             fontSize=24,
             textColor=colors.HexColor('#1f77b4'),
             spaceAfter=30,
@@ -122,10 +139,19 @@ class ReportHelper:
         heading_style = ParagraphStyle(
             'CustomHeading',
             parent=styles['Heading2'],
+            fontName=korean_font,
             fontSize=16,
             textColor=colors.HexColor('#2c3e50'),
             spaceAfter=12,
             spaceBefore=12
+        )
+
+        normal_style = ParagraphStyle(
+            'KoreanNormal',
+            parent=styles['Normal'],
+            fontName=korean_font,
+            fontSize=10,
+            leading=14
         )
 
         # Add title
@@ -134,7 +160,7 @@ class ReportHelper:
 
         # Add metadata
         metadata = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Author: {author}"
-        elements.append(Paragraph(metadata, styles['Normal']))
+        elements.append(Paragraph(metadata, normal_style))
         elements.append(Spacer(1, 20))
 
         # Add sections
@@ -144,8 +170,12 @@ class ReportHelper:
             elements.append(Spacer(1, 6))
 
             if section["type"] == "text":
-                # Add text content
-                elements.append(Paragraph(section["content"], styles['Normal']))
+                # Add text content - handle markdown formatting for PDF
+                content = section["content"].replace('\n', '<br/>')
+                # Escape special characters for ReportLab
+                content = content.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                content = content.replace('&lt;br/&gt;', '<br/>')  # Restore line breaks
+                elements.append(Paragraph(content, normal_style))
                 elements.append(Spacer(1, 12))
 
             elif section["type"] == "dataframe":
@@ -155,20 +185,22 @@ class ReportHelper:
                     # Limit to first 50 rows for PDF
                     df_display = df.head(50)
 
-                    # Convert DataFrame to list of lists
+                    # Convert DataFrame to list of lists with string conversion for Korean
                     data = [df_display.columns.tolist()] + df_display.values.tolist()
 
-                    # Create table
+                    # Create table with Korean font support
                     table = Table(data)
                     table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTNAME', (0, 0), (-1, -1), korean_font),  # Apply Korean font to entire table
                         ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('FONTSIZE', (0, 1), (-1, -1), 9),
                         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
                     ]))
 
                     elements.append(table)

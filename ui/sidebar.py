@@ -1,6 +1,8 @@
 import streamlit as st
 from ui.session import create_new_session, switch_session, get_session_preview
-from core.config import get_config
+from core.config import get_config, init_databricks_client
+from utils.report_generator import generate_business_report, generate_report_preview
+from datetime import datetime
 
 
 def render_sidebar():
@@ -98,6 +100,86 @@ def render_sidebar():
                 st.markdown('<div class="empty-state">💬 No chats yet<br><span style="font-size: 0.75rem; color: #6b7280;">Start a conversation!</span></div>', unsafe_allow_html=True)
 
         st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
+
+        # Report Generation Section
+        if total_messages > 0:
+            st.markdown('<div class="section-title">📊 Reports</div>', unsafe_allow_html=True)
+
+            # Generate report preview
+            messages = st.session_state.get("messages", [])
+            preview = generate_report_preview(messages)
+
+            # Show report stats
+            if preview["total_queries"] > 0:
+                with st.expander("Report Preview", expanded=False):
+                    st.markdown(f"**Queries**: {preview['total_queries']}")
+                    st.markdown(f"**Domains**: {', '.join(preview['domains']) if preview['domains'] else 'None'}")
+                    st.markdown(f"**Data Points**: {preview['total_data_points']:,}")
+
+                # Initialize report data in session state
+                if "generated_report" not in st.session_state:
+                    st.session_state.generated_report = None
+
+                # Generate Report Button
+                if st.button("📄 Generate Business Report", use_container_width=True, key="gen_report_btn"):
+                    with st.spinner("Generating comprehensive report..."):
+                        # Get Databricks client
+                        w = init_databricks_client()
+
+                        # Generate report
+                        result = generate_business_report(
+                            w=w,
+                            messages=messages,
+                            title=f"Business Analysis Report - {datetime.now().strftime('%Y-%m-%d')}",
+                            author="Databricks Data Chat"
+                        )
+
+                        # Store result in session state
+                        st.session_state.generated_report = result
+
+                # Show download buttons if report exists
+                if st.session_state.generated_report is not None:
+                    result = st.session_state.generated_report
+
+                    if result["success"]:
+                        st.success("✅ Report generated successfully!")
+
+                        # Create download buttons
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=result["pdf"],
+                                file_name=f"business_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key="download_pdf_btn"
+                            )
+
+                        with col2:
+                            st.download_button(
+                                label="📥 Download HTML",
+                                data=result["html"],
+                                file_name=f"business_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                                mime="text/html",
+                                use_container_width=True,
+                                key="download_html_btn"
+                            )
+
+                        # Clear report button
+                        if st.button("🔄 Generate New Report", use_container_width=True, key="clear_report_btn"):
+                            st.session_state.generated_report = None
+                            st.rerun()
+                    else:
+                        st.error(f"❌ Report generation failed: {result.get('error', 'Unknown error')}")
+                        if st.button("🔄 Try Again", use_container_width=True, key="retry_report_btn"):
+                            st.session_state.generated_report = None
+                            st.rerun()
+            else:
+                st.info("💡 Chat with data to enable report generation")
+
+            st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
 
         # Clear All Sessions Button
         if st.button("🗑️ Clear All Sessions", use_container_width=True, key="clear_btn"):
