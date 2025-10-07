@@ -111,11 +111,6 @@ def render_sidebar():
 
             # Show report stats
             if preview["total_queries"] > 0:
-                with st.expander("Report Preview", expanded=False):
-                    st.markdown(f"**Queries**: {preview['total_queries']}")
-                    st.markdown(f"**Domains**: {', '.join(preview['domains']) if preview['domains'] else 'None'}")
-                    st.markdown(f"**Data Points**: {preview['total_data_points']:,}")
-
                 # Initialize report data in session state
                 if "generated_report" not in st.session_state:
                     st.session_state.generated_report = None
@@ -177,7 +172,30 @@ def render_sidebar():
                             st.session_state.generated_report = None
                             st.rerun()
             else:
-                st.info("💡 Chat with data to enable report generation")
+                # Enhanced empty state with better visual design
+                st.markdown("""
+                <div style="
+                    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%);
+                    border: 1px solid rgba(91, 143, 212, 0.25);
+                    border-left: 3px solid #5b8fd4;
+                    border-radius: 0.75rem;
+                    padding: 1.25rem;
+                    margin: 0.5rem 0;
+                    text-align: center;
+                    backdrop-filter: blur(10px);
+                ">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📊</div>
+                    <div style="font-size: 0.875rem; font-weight: 600; color: #93c5fd; margin-bottom: 0.5rem;">
+                        Start Chatting to Enable Reports
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6b7280; line-height: 1.4;">
+                        Generate comprehensive business reports with:<br>
+                        • LLM-powered insights<br>
+                        • Data visualizations<br>
+                        • PDF & HTML export
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
             st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
 

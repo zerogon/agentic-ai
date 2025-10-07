@@ -283,12 +283,113 @@ def apply_custom_styles():
         margin: 0.5rem 0;
     }
     /* Info message styling */
+    [data-testid="stSidebar"] .element-container:has([data-testid="stAlert"]) {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        border: none !important;
+    }
     [data-testid="stSidebar"] [data-testid="stAlert"] {
-        background-color: #1f2937;
-        border-left: 3px solid #3b82f6;
-        border-radius: 0.375rem;
-        padding: 0.625rem;
-        font-size: 0.8rem;
+        background-color: #1f2937 !important;
+        border: none !important;
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        border-left: 3px solid #3b82f6 !important;
+        border-radius: 0.375rem !important;
+        padding: 0.75rem !important;
+        font-size: 0.8rem !important;
+        min-height: 3rem !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+    }
+    /* Remove thin line from emotion cache */
+    [data-testid="stSidebar"] .st-emotion-cache-1xmp9w2,
+    [data-testid="stSidebar"] .e9q2xfh0 {
+        border: none !important;
+        border-top: none !important;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    /* Success message styling - remove green line */
+    [data-testid="stSidebar"] [data-testid="stSuccess"],
+    [data-testid="stSidebar"] .element-container:has([data-testid="stSuccess"]) {
+        border: none !important;
+        border-top: none !important;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSuccess"] {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        border: 1px solid rgba(16, 185, 129, 0.3) !important;
+        border-left: 3px solid #10b981 !important;
+        border-radius: 0.5rem !important;
+        padding: 0.75rem !important;
+        font-size: 0.8rem !important;
+        margin: 0.5rem 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSuccess"] p {
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #d1d5db !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"]::before,
+    [data-testid="stSidebar"] [data-testid="stAlert"]::after {
+        display: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] * {
+        box-sizing: border-box !important;
+        border-top: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] [class*="stAlertContainer"] {
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        padding: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin: 0 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+        border: none !important;
+        border-top: none !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] [class*="stAlertContainer"] {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+        border-top: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] > div {
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] svg {
+        flex-shrink: 0 !important;
+        width: 1rem !important;
+        height: 1rem !important;
+        margin: 0 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] p {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.4 !important;
+        white-space: nowrap !important;
+        text-align: center !important;
     }
     /* Divider styling */
     [data-testid="stSidebar"] hr {
