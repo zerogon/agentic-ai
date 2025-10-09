@@ -202,45 +202,27 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     # Parse the complete response
                     routing_result = router.parse_last_stream_result()
 
-                # Now stream the execution plan with typing effect
+                # Now stream the rationale with typing effect
                 if routing_result["success"]:
-                    rationale = routing_result.get("rationale", {})
-                    if isinstance(rationale, dict):
-                        execution_plan = rationale.get("execution_plan", "")
+                    rationale = routing_result.get("rationale", "")
 
-                        if execution_plan:
-                            st.markdown("📋 **Action Plan**")
+                    if rationale and isinstance(rationale, str):
+                        st.markdown("📋 **Analysis Plan**")
 
-                            # Create placeholder for streaming text
-                            plan_container = st.empty()
-                            displayed_text = ""
+                        # Create placeholder for streaming text
+                        plan_container = st.empty()
+                        displayed_text = ""
 
-                            # Stream word by word for better performance
-                            words = execution_plan.split()
-                            for i, word in enumerate(words):
-                                displayed_text += word
-                                if i < len(words) - 1:
-                                    displayed_text += " "
+                        # Stream word by word for better performance
+                        words = rationale.split()
+                        for i, word in enumerate(words):
+                            displayed_text += word
+                            if i < len(words) - 1:
+                                displayed_text += " "
 
-                                # Update display
-                                plan_container.markdown(displayed_text)
-                                time.sleep(0.1)  # Delay for typing effect
-
-                        understanding = rationale.get("understanding", "")
-                        if understanding:
-                            # Stream understanding text
-                            st.markdown("💡 **Understanding**")
-                            understanding_container = st.empty()
-                            displayed_understanding = ""
-
-                            understanding_words = understanding.split()
-                            for i, word in enumerate(understanding_words):
-                                displayed_understanding += word
-                                if i < len(understanding_words) - 1:
-                                    displayed_understanding += " "
-
-                                understanding_container.markdown(displayed_understanding)
-                                time.sleep(0.1)
+                            # Update display
+                            plan_container.markdown(displayed_text)
+                            time.sleep(0.05)  # Delay for typing effect
 
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]

@@ -44,45 +44,49 @@ Genie는 잘못된 SQL을 실행하고, 잘못된 지표가 대시보드에 노�
    - 사용자 질의 → Intent 배열 생성  
    - Genie Domain 식별  
    - `INSIGHT_REPORT` 포함 여부 명시 (항상 true)  
-   - rationale에 “데이터 조회 및 분석이 끝난 후 INSIGHT_REPORT를 생성해야 함” 명시
+   - rationale에는 사용자의 질문을 어떻게 이해했고, 어떤 분석 흐름으로 처리할지, 어떤 Genie가 호출될지를 하나의 자연스러운 문단으로 작성한다.  
+   - rationale 끝에는 “데이터 조회 및 분석이 끝난 후 INSIGHT_REPORT를 생성해야 함”을 명시한다.
 
 2. **Router의 한계**
-   - Router는 결과를 요약하거나 해석하지 않는다.  
-   - summary, next_question, insight 문장 생성 절대 금지.  
+   - Router는 결과를 요약하거나 해석하지 않는다.
+   - summary, next_question, insight 문장 생성 절대 금지.
    - 그건 **Phase 2 Insight Agent**의 역할이다.
 
-3. **GENIE_DOMAIN 규칙**
-   - 매출, 실적, 판매, 수익 → SALES_GENIE
-   - 계약, 고객, 상품 → CONTRACT_GENIE
-   - 지역, 지사, 도시, 지도, 위치 → REGION_GENIE
+3. **rationale 작성 규칙**
+   - rationale은 단일 문자열로 작성한다 (dict 형태 아님)
+   - 사용자의 질문 이해 내용과 실행 계획을 자연스러운 한국어 문단으로 통합
+   - 어떤 Genie를 호출할지, 어떤 분석 흐름으로 처리할지 명확히 기술
+   - 마지막에 "분석이 완료되면 후속 단계에서 INSIGHT_REPORT를 생성해야 합니다." 포함
+
+4. **GENIE_DOMAIN 규칙**
+   - 매출, 실적, 판매, 수익 → SALES_GENIE  
+   - 계약, 고객, 상품 → CONTRACT_GENIE  
+   - 지역, 지사, 도시, 지도, 위치 → REGION_GENIE  
    - 전체, 요약, 한눈에, 대시보드 → SALES_GENIE + CONTRACT_GENIE (통합형)
 
-   **⚠️ 이전 데이터 참조 규칙** (매우 중요):
-   - "이 데이터", "위 결과", "방금", "이전", "앞서", "해당" 등 지시대명사 포함 시:
-     → INTENT: INSIGHT_REPORT
-     → GENIE_DOMAIN: [] (빈 배열 - 새 조회 불필요, 이전 데이터 재사용)
+   **⚠️ 이전 데이터 참조 규칙 (매우 중요)**  
+   - “이 데이터”, “위 결과”, “방금”, “이전”, “앞서”, “해당” 등의 지시대명사 포함 시  
+     → `intents`: ["INSIGHT_REPORT"]  
+     → `genie_domain`: [] (새 조회 불필요, 이전 데이터 재사용)
 
-   - 새로운 조회 조건이나 필터 추가 시:
-     → INTENT: DATA_RETRIEVAL + INSIGHT_REPORT
-     → GENIE_DOMAIN: [해당 도메인] (새 데이터 필요)
+   - 새로운 조회 조건이나 필터 추가 시  
+     → `intents`: ["DATA_RETRIEVAL", "INSIGHT_REPORT"]  
+     → `genie_domain`: [해당 도메인] (새 데이터 필요)
 
 5. **REGION_GENIE 예외**
-   - REGION_GENIE가 포함된 경우 rationale.execution_plan에  
-     “K-Prototypes 알고리즘으로 군집을 구분하는 단계가 포함된다.” 명시.
+   - REGION_GENIE가 포함된 경우, rationale 문단에
+     "이 분석에는 사전에 정의된 K-Prototypes 알고리즘으로 지역별 군집을 구분하는 단계가 포함됩니다."
+     라는 문장을 반드시 추가한다.
 
-5. **출력 형식**
+6. **출력 형식**
    ```json
    {
      "intents": ["DATA_RETRIEVAL", "VISUALIZATION", "INSIGHT_REPORT"],
      "genie_domain": ["REGION_GENIE", "SALES_GENIE"],
      "keywords": ["서울", "지역", "매출"],
-     "rationale": {
-       "understanding": "서울 지역의 매출 데이터를 분석하고 싶으신 걸로 이해했습니다.",
-       "execution_plan": "Databricks REGION_GENIE를 호출해 데이터를 불러오고, 사전에 정의된 K-Prototypes 알고리즘으로 지역 군집을 구분한 후 SALES_GENIE 데이터를 결합해 시각화합니다. 분석이 완료되면 후속 단계에서 INSIGHT_REPORT를 생성해야 합니다.",
-       "insight_generation_required": true
-     }
-   }
-"""
+     "rationale": "서울 지역의 매출 현황을 살펴보시려는 걸로 이해했습니다. 우선 Databricks REGION_GENIE를 통해 지역별 데이터를 조회하고, 사전에 설정된 K-Prototypes 알고리즘으로 지역을 여러 군집으로 나누어 특징을 분석하겠습니다. 그런 다음 SALES_GENIE 데이터를 함께 결합해 시각적으로 보기 쉽게 정리할 예정입니다. 이 분석이 끝나면, 후속 단계에서 전체 결과를 요약하고 정리하는 리포트를 생성하겠습니다.",
+     "insight_generation_required": true
+   }"""
 
     def analyze_query(self, user_query: str, stream: bool = False):
         """
