@@ -116,8 +116,8 @@ def render_sidebar():
                     st.session_state.generated_report = None
 
                 # Generate Report Button
-                if st.button("📄 Generate Business Report", use_container_width=True, key="gen_report_btn"):
-                    with st.spinner("Generating comprehensive report..."):
+                if st.button("📄 Generate Report", use_container_width=True, key="gen_report_btn"):
+                    with st.spinner("Generating..."):
                         # Get Databricks client
                         w = init_databricks_client()
 
@@ -137,16 +137,20 @@ def render_sidebar():
                     result = st.session_state.generated_report
 
                     if result["success"]:
-                        st.success("✅ Report generated successfully!")
+                        # Compact success message
+                        st.markdown(
+                            '<div style="font-size: 0.75rem; color: #10b981; text-align: center; margin: 0.25rem 0;">✅ Ready</div>',
+                            unsafe_allow_html=True
+                        )
 
-                        # Create download buttons
+                        # Create compact download buttons
                         col1, col2 = st.columns(2)
 
                         with col1:
                             st.download_button(
-                                label="📥 Download PDF",
+                                label="PDF",
                                 data=result["pdf"],
-                                file_name=f"business_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                                 mime="application/pdf",
                                 use_container_width=True,
                                 key="download_pdf_btn"
@@ -154,50 +158,44 @@ def render_sidebar():
 
                         with col2:
                             st.download_button(
-                                label="📥 Download HTML",
+                                label="HTML",
                                 data=result["html"],
-                                file_name=f"business_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                                file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
                                 mime="text/html",
                                 use_container_width=True,
                                 key="download_html_btn"
                             )
 
-                        # Clear report button
-                        if st.button("🔄 Generate New Report", use_container_width=True, key="clear_report_btn"):
+                        # Compact clear button
+                        if st.button("🔄 New", use_container_width=True, key="clear_report_btn"):
                             st.session_state.generated_report = None
                             st.rerun()
                     else:
-                        st.error(f"❌ Report generation failed: {result.get('error', 'Unknown error')}")
-                        if st.button("🔄 Try Again", use_container_width=True, key="retry_report_btn"):
+                        st.markdown(
+                            f'<div style="font-size: 0.75rem; color: #ef4444; text-align: center; margin: 0.25rem 0;">❌ {result.get("error", "Error")}</div>',
+                            unsafe_allow_html=True
+                        )
+                        if st.button("🔄 Retry", use_container_width=True, key="retry_report_btn"):
                             st.session_state.generated_report = None
                             st.rerun()
             else:
-                # Enhanced empty state with better visual design
+                # Compact empty state
                 st.markdown("""
                 <div style="
-                    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%);
-                    border: 1px solid rgba(91, 143, 212, 0.25);
-                    border-left: 3px solid #5b8fd4;
-                    border-radius: 0.75rem;
-                    padding: 1.25rem;
-                    margin: 0.5rem 0;
+                    background: rgba(59, 130, 246, 0.05);
+                    border: 1px solid rgba(91, 143, 212, 0.2);
+                    border-radius: 0.5rem;
+                    padding: 0.75rem;
+                    margin: 0.25rem 0;
                     text-align: center;
-                    backdrop-filter: blur(10px);
                 ">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📊</div>
-                    <div style="font-size: 0.875rem; font-weight: 600; color: #93c5fd; margin-bottom: 0.5rem;">
-                        Start Chatting to Enable Reports
-                    </div>
-                    <div style="font-size: 0.75rem; color: #6b7280; line-height: 1.4;">
-                        Generate comprehensive business reports with:<br>
-                        • LLM-powered insights<br>
-                        • Data visualizations<br>
-                        • PDF & HTML export
+                    <div style="font-size: 0.75rem; color: #6b7280;">
+                        📊 Generate reports from chat data
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
 
         # Clear All Sessions Button
         if st.button("🗑️ Clear All Sessions", use_container_width=True, key="clear_btn"):
