@@ -22,7 +22,19 @@ def display_messages():
 
             # Display Plotly visualization if present
             if "chart_data" in message:
-                st.plotly_chart(message["chart_data"], use_container_width=True)
+                chart_data = message["chart_data"]
+
+                # Check if chart_data is HTML string (new format) or Figure object (legacy)
+                if isinstance(chart_data, str):
+                    # HTML string - render with st.components
+                    st.components.v1.html(
+                        chart_data,
+                        height=600,
+                        scrolling=True
+                    )
+                else:
+                    # Plotly Figure object - use plotly_chart (legacy compatibility)
+                    st.plotly_chart(chart_data, use_container_width=True)
 
             # Display table if present (skip if Folium map shown)
             if "table_data" in message and not message["table_data"].empty:

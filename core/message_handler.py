@@ -346,6 +346,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         # Stream domain selection message
                         if is_multi_domain:
                             domain_msg = f"🎯 Using multiple Genies: {', '.join(genie_domains)}"
+                            selected_space_id = None  # Not used in multi-domain mode
                         else:
                             selected_domain = genie_domains[0]
                             selected_space_id = get_space_id_by_domain(selected_domain)
@@ -463,14 +464,34 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                             "code": msg.get("code")
                                         }
 
-                                        # Add to chat history
-                                        st.session_state.messages.append({
+                                        # Determine chart type based on domain
+                                        domain_chart_type = "line" if domain == "SALES_GENIE" else "bar"
+
+                                        # Create chart for this domain
+                                        domain_chart = data_helper.create_chart(
+                                            msg["data"],
+                                            domain_chart_type,
+                                            title=f"{domain} Data",
+                                            dark_mode=True
+                                        )
+
+                                        # Add to chat history with chart saved as HTML
+                                        message_data = {
                                             "role": "assistant",
                                             "content": f"[{domain}] {msg['content']}",
                                             "code": msg.get("code"),
                                             "table_data": msg["data"],
                                             "domain": domain
-                                        })
+                                        }
+
+                                        # Store chart as HTML (same pattern as single-domain)
+                                        if domain_chart:
+                                            message_data["chart_data"] = domain_chart.to_html(
+                                                include_plotlyjs='cdn',
+                                                div_id=f'plotly-chart-{domain}-{len(st.session_state.messages)}'
+                                            )
+
+                                        st.session_state.messages.append(message_data)
                                     else:
                                         # Text-only response
                                         st.session_state.messages.append({
@@ -694,11 +715,15 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                             "table_data": msg["data"]
                                         }
 
-                                        # Store map or chart
+                                        # Store map or chart as HTML (for session state stability)
                                         if folium_map:
                                             message_data["folium_map"] = folium_map._repr_html_()
                                         elif plotly_fig:
-                                            message_data["chart_data"] = plotly_fig
+                                            # Convert Plotly figure to HTML string (same as Folium pattern)
+                                            message_data["chart_data"] = plotly_fig.to_html(
+                                                include_plotlyjs='cdn',
+                                                div_id=f'plotly-chart-{len(st.session_state.messages)}'
+                                            )
 
                                         st.session_state.messages.append(message_data)
                                     else:

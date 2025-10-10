@@ -50,13 +50,13 @@ class ReportHelper:
             "timestamp": datetime.now()
         })
 
-    def add_chart(self, title: str, fig: go.Figure):
+    def add_chart(self, title: str, fig):
         """
         Add a chart section to the report
 
         Args:
             title: Section title
-            fig: Plotly figure
+            fig: Plotly figure object or HTML string
         """
         self.report_data.append({
             "title": title,
@@ -231,14 +231,21 @@ class ReportHelper:
                 # Add chart as image
                 fig = section["content"]
 
-                # Convert Plotly figure to image
-                img_bytes = fig.to_image(format="png", width=600, height=400)
-                img_buffer = io.BytesIO(img_bytes)
+                # Check if it's a Plotly Figure object or HTML string
+                if isinstance(fig, str):
+                    # HTML string - skip for PDF, add note
+                    chart_note = "📊 Interactive chart available in HTML version of this report."
+                    elements.append(Paragraph(chart_note, normal_style))
+                    elements.append(Spacer(1, 12))
+                else:
+                    # Plotly Figure object - convert to image
+                    img_bytes = fig.to_image(format="png", width=600, height=400)
+                    img_buffer = io.BytesIO(img_bytes)
 
-                # Add image to PDF
-                img = Image(img_buffer, width=5*inch, height=3.33*inch)
-                elements.append(img)
-                elements.append(Spacer(1, 12))
+                    # Add image to PDF
+                    img = Image(img_buffer, width=5*inch, height=3.33*inch)
+                    elements.append(img)
+                    elements.append(Spacer(1, 12))
 
             elif section["type"] == "map":
                 # Add note that map is available in HTML version
@@ -439,12 +446,18 @@ class ReportHelper:
 
             elif section["type"] == "chart":
                 fig = section["content"]
-                # Convert Plotly figure to HTML div
-                chart_html = fig.to_html(
-                    include_plotlyjs=False,
-                    div_id=f'chart-{idx+1}'
-                )
-                section_data["content"] = chart_html
+
+                # Check if it's already HTML string or Plotly Figure
+                if isinstance(fig, str):
+                    # Already HTML string - use directly
+                    section_data["content"] = fig
+                else:
+                    # Plotly Figure object - convert to HTML div
+                    chart_html = fig.to_html(
+                        include_plotlyjs=False,
+                        div_id=f'chart-{idx+1}'
+                    )
+                    section_data["content"] = chart_html
 
             elif section["type"] == "map":
                 # Map HTML is already stored as string
