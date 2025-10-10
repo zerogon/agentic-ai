@@ -648,3 +648,4 @@ class DataHelper:
             "numeric_summary": df.describe().to_dict() if len(df.select_dtypes(include=['number']).columns) > 0 else {},
             "null_counts": df.isnull().sum().to_dict()
         }
+

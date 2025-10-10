@@ -2,7 +2,7 @@
 LLM Helper Functions
 Provides utilities for interacting with Databricks Model Serving endpoints 
 """
-
+import streamlit as st
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 from typing import List, Dict, Optional
@@ -21,8 +21,11 @@ class LLMHelper:
             provider: LLM provider - "databricks" 
         """
         self.provider = provider.lower()
-        self.w = workspace_client
- 
+        self.w = WorkspaceClient(
+            host=st.secrets["databricks"]["HOST"],
+            token=st.secrets["databricks"]["TOKEN"]
+        )
+
         if self.provider == "databricks" and not workspace_client:
             raise ValueError("workspace_client is required for Databricks provider")
 
@@ -191,6 +194,7 @@ class LLMHelper:
         """
         try:
             # Get OpenAI-compatible client from Databricks SDK
+
             client = self.w.serving_endpoints.get_open_ai_client()
 
             # Convert messages to OpenAI format

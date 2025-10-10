@@ -48,7 +48,55 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
         analysis_messages = [
             {
                 "role": "system",
-                "content": "You are a data analyst. Analyze the provided data and generate actionable insights, trends, and recommendations in Korean."
+                "content": """### <role>
+너는 **기업 실무 보고용 데이터 분석가(Data Analyst)**다.  
+너의 보고서는 즉각적인 판단과 조치를 위해 사용된다.  
+따라서 명확하지 않은 추정이나 과도한 해석은 오히려 해롭다.  
+데이터는 네 판단의 ‘유일한 근거’다.
+
+---
+
+### <objective>
+1. 데이터의 주요 특징과 핵심 지표를 요약한다.  
+   - 합계, 평균, 최대/최소, 주요 비중 등 필수 통계치를 간단히 정리한다.  
+2. 데이터의 흐름, 분포, 변화율 등을 바탕으로 **객관적 분석**을 제공한다.  
+   - 단, 의미 없는 패턴은 언급하지 않는다.  
+3. 명확한 이상치, 급격한 변동, 특이한 패턴이 발견될 때만 인사이트를 제시한다.  
+   - 그 외에는 Insight 섹션을 생략한다.  
+4. 분석 결과는 의사결정자가 즉시 이해하고 활용할 수 있는 형태로 정리한다.
+
+---
+
+### <rules>
+- ‘요약’과 ‘분석’은 항상 출력하되, ‘인사이트’는 조건부 출력이다.  
+- 인사이트가 존재하지 않을 경우 명시적으로 “(특이사항 없음)”이라고 표기하지 않는다 — 그냥 생략한다.  
+- 불필요한 형용사나 주관적 표현 금지 (“높은 편”, “다소”, “비교적” 등).  
+- 통계 기반의 근거가 없는 주장은 절대 하지 않는다.  
+- 간결하고 압축적인 보고 형식을 유지한다.  
+
+---
+
+### <output>
+1. **요약(Summary):**  
+   - 데이터의 기본 구조와 주요 지표 요약  
+
+2. **분석(Analysis):**  
+   - 관찰된 흐름, 분포, 증감 등 객관적 분석 결과  
+
+3. **(선택적) 인사이트(Insight):**  
+   - 명백한 이상치나 특이한 트렌드가 있을 때만 출력  
+   - “이 수치는 왜 중요한가”를 한 문장으로 설명  
+
+---
+
+### <urgency>
+이 분석은 단순한 리포트가 아니다.  
+**지금 이 순간의 데이터가 무엇을 말하고 있는지** 빠르게 파악해야 한다.  
+사소한 판단 지연이 손실로 이어질 수 있다.  
+데이터가 보여주는 ‘사실’만을 근거로, 필요한 메시지만 전달하라.  
+불필요한 해석은 시간 낭비다.  
+이건 단순한 요청이 아니다. 반드시 성공시켜야 한다.
+                """
             },
             {
                 "role": "user",
@@ -269,7 +317,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 st.write(f"**{item['domain']}**: {len(item['data'])} rows")
 
                         # Analyze with LLM (streaming)
-                        st.markdown("### 💡 LLM Insight Analysis")
+                        st.markdown("### 💡 LLM Analysis")
                         insight_container = st.empty()
 
                         # Stream LLM analysis and get result
@@ -281,7 +329,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Add to chat history
                             st.session_state.messages.append({
                                 "role": "assistant",
-                                "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                "content": f"💡 **LLM Analysis**\n\n{insight_text}"
                             })
                         else:
                             error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
@@ -398,11 +446,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 st.markdown(msg["content"])
 
                                 if msg.get("type") == "query":
-                                    # Show SQL code (without expander to avoid nesting)
+                                    # Show SQL code in collapsible expander
                                     if msg.get("code"):
-                                        st.caption(f"📝 Generated SQL ({domain}):")
-                                        formatted_sql = data_helper.format_sql_code(msg["code"])
-                                        st.code(formatted_sql, language="sql")
+                                        with st.expander(f"📝 Generated SQL ({domain})", expanded=False):
+                                            formatted_sql = data_helper.format_sql_code(msg["code"])
+                                            st.code(formatted_sql, language="sql")
 
                                     # Store data for visualization
                                     if not msg["data"].empty:
@@ -484,9 +532,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         # Clear temporary storage
                         del st.session_state.multi_genie_data
 
-                    # LLM Insight Analysis (if INSIGHT_REPORT intent detected)
+                    # LLM Analysis (if INSIGHT_REPORT intent detected)
                     if needs_insight_report and genie_results:
-                        st.markdown("### 💡 LLM Insight Analysis")
+                        st.markdown("### 💡 LLM Analysis")
 
                         # Prepare data list for LLM
                         data_list = []
@@ -522,7 +570,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Add LLM insight to chat history
                             st.session_state.messages.append({
                                 "role": "assistant",
-                                "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                "content": f"💡 **LLM Analysis**\n\n{insight_text}"
                             })
                         else:
                             error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
@@ -577,11 +625,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 st.markdown(msg["content"])
 
                                 if msg.get("type") == "query":
-                                    # Show SQL code (without expander to avoid nesting)
+                                    # Show SQL code in collapsible expander
                                     if msg.get("code"):
-                                        st.caption("📝 Generated SQL:")
-                                        formatted_sql = data_helper.format_sql_code(msg["code"])
-                                        st.code(formatted_sql, language="sql")
+                                        with st.expander("📝 Generated SQL", expanded=False):
+                                            formatted_sql = data_helper.format_sql_code(msg["code"])
+                                            st.code(formatted_sql, language="sql")
 
                                     # Show data and visualization
                                     if not msg["data"].empty:
@@ -630,9 +678,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         "content": msg["content"]
                                     })
 
-                            # LLM Insight Analysis (if INSIGHT_REPORT intent detected)
+                            # LLM Analysis (if INSIGHT_REPORT intent detected)
                             if needs_insight_report:
-                                st.markdown("### 💡 LLM Insight Analysis")
+                                st.markdown("### 💡 LLM Analysis")
 
                                 # Prepare data list for LLM
                                 data_list = []
@@ -659,7 +707,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     # Add LLM insight to chat history
                                     st.session_state.messages.append({
                                         "role": "assistant",
-                                        "content": f"💡 **LLM Insight Analysis**\n\n{insight_text}"
+                                        "content": f"💡 **LLM Analysis**\n\n{insight_text}"
                                     })
                                 else:
                                     error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
