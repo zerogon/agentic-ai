@@ -636,35 +636,71 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         # Auto-detect or use selected chart type
                                         selected_chart = chart_type.lower()
                                         if selected_chart == "auto":
-                                            selected_chart = data_helper.auto_detect_chart_type(msg["data"])
+                                            # Force map for REGION_GENIE
+                                            if genie_domains and "REGION_GENIE" in genie_domains:
+                                                selected_chart = "map"
+                                            else:
+                                                selected_chart = data_helper.auto_detect_chart_type(msg["data"])
 
-                                        # Create chart
-                                        fig = data_helper.create_chart(
-                                            msg["data"],
-                                            selected_chart,
-                                            title="Query Results",
-                                            dark_mode=True
-                                        )
+                                        # Create Folium map or Plotly chart
+                                        folium_map = None
+                                        plotly_fig = None
 
-                                        if fig:
-                                            st.plotly_chart(fig, use_container_width=True)
+                                        if selected_chart == "map":
+                                            # Try to create Folium map first
+                                            folium_map = data_helper.create_folium_map(msg["data"])
 
-                                        # Show data table (skip for REGION_GENIE with map visualization)
-                                        is_region_genie = genie_domains and "REGION_GENIE" in genie_domains
+                                            if folium_map:
+                                                # Display Folium map
+                                                st.components.v1.html(
+                                                    folium_map._repr_html_(),
+                                                    height=600,
+                                                    scrolling=True
+                                                )
+                                            else:
+                                                # Fallback to Plotly map
+                                                plotly_fig = data_helper.create_chart(
+                                                    msg["data"],
+                                                    "map",
+                                                    title="Query Results",
+                                                    dark_mode=True
+                                                )
+                                                if plotly_fig:
+                                                    st.plotly_chart(plotly_fig, use_container_width=True)
+                                        else:
+                                            # Create Plotly chart for non-map visualizations
+                                            plotly_fig = data_helper.create_chart(
+                                                msg["data"],
+                                                selected_chart,
+                                                title="Query Results",
+                                                dark_mode=True
+                                            )
+
+                                            if plotly_fig:
+                                                st.plotly_chart(plotly_fig, use_container_width=True)
+
+                                        # Show data table (skip for maps)
                                         is_map_chart = selected_chart == "map"
 
-                                        if not (is_region_genie and is_map_chart):
+                                        if not is_map_chart:
                                             st.markdown("**📋 Data:**")
                                             st.dataframe(msg["data"], use_container_width=True)
 
                                         # Add to chat history
-                                        st.session_state.messages.append({
+                                        message_data = {
                                             "role": "assistant",
                                             "content": msg["content"],
                                             "code": msg.get("code"),
-                                            "chart_data": fig,
                                             "table_data": msg["data"]
-                                        })
+                                        }
+
+                                        # Store map or chart
+                                        if folium_map:
+                                            message_data["folium_map"] = folium_map._repr_html_()
+                                        elif plotly_fig:
+                                            message_data["chart_data"] = plotly_fig
+
+                                        st.session_state.messages.append(message_data)
                                     else:
                                         # Text-only response
                                         st.session_state.messages.append({

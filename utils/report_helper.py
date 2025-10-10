@@ -65,6 +65,27 @@ class ReportHelper:
             "timestamp": datetime.now()
         })
 
+    def add_map(self, title: str, folium_map):
+        """
+        Add a Folium map section to the report
+
+        Args:
+            title: Section title
+            folium_map: Folium Map object or HTML string
+        """
+        # Convert Folium map to HTML if it's a Folium object
+        if hasattr(folium_map, '_repr_html_'):
+            map_html = folium_map._repr_html_()
+        else:
+            map_html = folium_map
+
+        self.report_data.append({
+            "title": title,
+            "content": map_html,
+            "type": "map",
+            "timestamp": datetime.now()
+        })
+
     def generate_pdf(
         self,
         output_path: Optional[str] = None,
@@ -219,6 +240,12 @@ class ReportHelper:
                 elements.append(img)
                 elements.append(Spacer(1, 12))
 
+            elif section["type"] == "map":
+                # Add note that map is available in HTML version
+                map_note = "📍 Interactive map available in HTML version of this report."
+                elements.append(Paragraph(map_note, normal_style))
+                elements.append(Spacer(1, 12))
+
         # Build PDF
         doc.build(elements)
 
@@ -322,6 +349,19 @@ class ReportHelper:
         .chart-container {
             margin-top: 20px;
         }
+        .map-container {
+            margin-top: 20px;
+            height: 600px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .map-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
         .footer {
             text-align: center;
             padding: 20px;
@@ -357,6 +397,12 @@ class ReportHelper:
         <script>
             {{ section.content | safe }}
         </script>
+        {% endif %}
+
+        {% if section.type == 'map' %}
+        <div class="map-container">
+            {{ section.content | safe }}
+        </div>
         {% endif %}
     </div>
     {% endfor %}
@@ -399,6 +445,10 @@ class ReportHelper:
                     div_id=f'chart-{idx+1}'
                 )
                 section_data["content"] = chart_html
+
+            elif section["type"] == "map":
+                # Map HTML is already stored as string
+                section_data["content"] = section["content"]
 
             sections.append(section_data)
 

@@ -6,7 +6,9 @@ Provides utilities for data processing and visualization
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
+import folium
+from utils.map_helper import MapHelper
 
 
 class DataHelper:
@@ -522,31 +524,125 @@ class DataHelper:
         lon_col = None
         color_col = None
 
+        # Normalize column name for matching (remove spaces, special chars, lowercase)
+        def normalize_col_name(col_name):
+            import re
+            normalized = str(col_name).lower().strip()
+            # Remove special characters and spaces
+            normalized = re.sub(r'[^a-z0-9가-힣]', '', normalized)
+            return normalized
+
         # Detect latitude column (case-insensitive, including partial matches)
-        lat_candidates = ['latitude', 'lat', '위도', 'y', 'wido']
+        # First, try exact matches for better accuracy
+        lat_candidates_exact = ['latitude', 'lat', '위도', 'wido']
+        lat_candidates_partial = ['y', '위', 'gislatitude', 'gislat', 'coord_lat']
+
+        # Try exact matches first
         for col in df.columns:
-            col_lower = str(col).lower().strip()
-            # Check exact match or if candidate is in column name
-            if col_lower in lat_candidates or any(cand in col_lower for cand in lat_candidates):
-                lat_col = col
+            col_normalized = normalize_col_name(col)
+            for cand in lat_candidates_exact:
+                if col_normalized == cand or cand == col_normalized:
+                    # Validate that column contains reasonable latitude values
+                    try:
+                        numeric_vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                        if len(numeric_vals) > 0:
+                            min_val, max_val = numeric_vals.min(), numeric_vals.max()
+                            # Check if values are in valid latitude range
+                            if -90 <= min_val <= 90 and -90 <= max_val <= 90:
+                                lat_col = col
+                                print(f"  🎯 Detected latitude column: '{col}' (exact match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
+                                break
+                    except:
+                        pass
+            if lat_col:
                 break
+
+        # If no exact match, try partial matches
+        if not lat_col:
+            for col in df.columns:
+                col_normalized = normalize_col_name(col)
+                for cand in lat_candidates_partial:
+                    if cand in col_normalized:
+                        # Validate that column contains reasonable latitude values
+                        try:
+                            numeric_vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                            if len(numeric_vals) > 0:
+                                min_val, max_val = numeric_vals.min(), numeric_vals.max()
+                                # Check if values are in valid latitude range
+                                if -90 <= min_val <= 90 and -90 <= max_val <= 90:
+                                    lat_col = col
+                                    print(f"  🎯 Detected latitude column: '{col}' (partial match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
+                                    break
+                        except:
+                            pass
+                if lat_col:
+                    break
 
         # Detect longitude column (case-insensitive, including partial matches)
-        lon_candidates = ['longitude', 'lon', 'lng', '경도', 'x', 'gyeongdo']
+        lon_candidates_exact = ['longitude', 'lon', 'lng', '경도', 'gyeongdo']
+        lon_candidates_partial = ['x', '경', 'gislongitude', 'gislon', 'coord_lon', 'coord_lng']
+
+        # Try exact matches first
         for col in df.columns:
-            col_lower = str(col).lower().strip()
-            # Check exact match or if candidate is in column name
-            if col_lower in lon_candidates or any(cand in col_lower for cand in lon_candidates):
-                lon_col = col
+            col_normalized = normalize_col_name(col)
+            # Skip if this is the latitude column
+            if col == lat_col:
+                continue
+            for cand in lon_candidates_exact:
+                if col_normalized == cand or cand == col_normalized:
+                    # Validate that column contains reasonable longitude values
+                    try:
+                        numeric_vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                        if len(numeric_vals) > 0:
+                            min_val, max_val = numeric_vals.min(), numeric_vals.max()
+                            # Check if values are in valid longitude range
+                            if -180 <= min_val <= 180 and -180 <= max_val <= 180:
+                                lon_col = col
+                                print(f"  🎯 Detected longitude column: '{col}' (exact match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
+                                break
+                    except:
+                        pass
+            if lon_col:
                 break
 
+        # If no exact match, try partial matches
+        if not lon_col:
+            for col in df.columns:
+                col_normalized = normalize_col_name(col)
+                # Skip if this is the latitude column
+                if col == lat_col:
+                    continue
+                for cand in lon_candidates_partial:
+                    if cand in col_normalized:
+                        # Validate that column contains reasonable longitude values
+                        try:
+                            numeric_vals = pd.to_numeric(df[col], errors='coerce').dropna()
+                            if len(numeric_vals) > 0:
+                                min_val, max_val = numeric_vals.min(), numeric_vals.max()
+                                # Check if values are in valid longitude range
+                                if -180 <= min_val <= 180 and -180 <= max_val <= 180:
+                                    lon_col = col
+                                    print(f"  🎯 Detected longitude column: '{col}' (partial match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
+                                    break
+                        except:
+                            pass
+                if lon_col:
+                    break
+
         # Detect category/color column (case-insensitive, including partial matches)
-        category_candidates = ['category', 'type', 'group', 'class', '카테고리', '유형', 'region', 'area', '지역']
+        category_candidates = [
+            'category', 'type', 'group', 'class', '카테고리', '유형',
+            'region', 'area', '지역', 'name', 'label', '이름', '명'
+        ]
         for col in df.columns:
-            col_lower = str(col).lower().strip()
+            col_normalized = normalize_col_name(col)
             # Check exact match or if candidate is in column name
-            if col_lower in category_candidates or any(cand in col_lower for cand in category_candidates):
-                color_col = col
+            for cand in category_candidates:
+                if cand in col_normalized or col_normalized in cand:
+                    color_col = col
+                    print(f"  🎯 Detected category column: '{col}' (matched: '{cand}')")
+                    break
+            if color_col:
                 break
 
         # If no explicit category column, use first categorical column
@@ -556,6 +652,7 @@ class DataHelper:
             categorical_cols = [c for c in categorical_cols if c not in [lat_col, lon_col]]
             if len(categorical_cols) > 0:
                 color_col = categorical_cols[0]
+                print(f"  🎯 Using first categorical column as color: '{color_col}'")
 
         return lat_col, lon_col, color_col
 
@@ -578,46 +675,58 @@ class DataHelper:
             # Check if columns exist
             if lat_col not in df.columns or lon_col not in df.columns:
                 print(f"    ❌ Columns missing: lat_col={lat_col in df.columns}, lon_col={lon_col in df.columns}")
+                print(f"    📋 Available columns: {df.columns.tolist()}")
                 return False
-
-            # Show sample data
-            print(f"    - Sample {lat_col}: {df[lat_col].head(3).tolist()}")
-            print(f"    - Sample {lon_col}: {df[lon_col].head(3).tolist()}")
-            print(f"    - {lat_col} dtype: {df[lat_col].dtype}")
-            print(f"    - {lon_col} dtype: {df[lon_col].dtype}")
 
             # Try to convert to numeric if needed
             lat_series = pd.to_numeric(df[lat_col], errors='coerce')
             lon_series = pd.to_numeric(df[lon_col], errors='coerce')
 
-            print(f"    - {lat_col} numeric dtype: {lat_series.dtype}")
-            print(f"    - {lon_col} numeric dtype: {lon_series.dtype}")
 
             # Check for NaN values after conversion
             lat_nan_count = lat_series.isna().sum()
             lon_nan_count = lon_series.isna().sum()
-            print(f"    - {lat_col} NaN count: {lat_nan_count}/{len(df)}")
-            print(f"    - {lon_col} NaN count: {lon_nan_count}/{len(df)}")
+            total_rows = len(df)
+  
+            # Allow up to 10% NaN values (some data might have missing coordinates)
+            if lat_nan_count > total_rows * 0.1 or lon_nan_count > total_rows * 0.1:
+                print(f"    ❌ Too many NaN values after conversion (>10%)")
+                if lat_nan_count > 0:
+                    print(f"    📋 First NaN {lat_col} values: {df[lat_col][lat_series.isna()].head(3).tolist()}")
+                if lon_nan_count > 0:
+                    print(f"    📋 First NaN {lon_col} values: {df[lon_col][lon_series.isna()].head(3).tolist()}")
+                return False
 
-            if lat_nan_count > 0 or lon_nan_count > 0:
-                print(f"    ❌ Contains NaN values after conversion")
+            # Get valid (non-NaN) coordinates for range checking
+            valid_lat = lat_series.dropna()
+            valid_lon = lon_series.dropna()
+
+            if len(valid_lat) == 0 or len(valid_lon) == 0:
+                print(f"    ❌ No valid coordinates after dropping NaN values")
                 return False
 
             # Check latitude range (-90 to 90)
-            lat_min, lat_max = lat_series.min(), lat_series.max()
-            print(f"    - {lat_col} range: {lat_min} to {lat_max}")
+            lat_min, lat_max = valid_lat.min(), valid_lat.max()
+            print(f"    - {lat_col} range: {lat_min:.6f} to {lat_max:.6f}")
             if lat_min < -90 or lat_max > 90:
                 print(f"    ❌ Latitude out of range (-90 to 90)")
+                print(f"    💡 Hint: Check if latitude/longitude columns are swapped")
                 return False
 
             # Check longitude range (-180 to 180)
-            lon_min, lon_max = lon_series.min(), lon_series.max()
-            print(f"    - {lon_col} range: {lon_min} to {lon_max}")
+            lon_min, lon_max = valid_lon.min(), valid_lon.max()
+            print(f"    - {lon_col} range: {lon_min:.6f} to {lon_max:.6f}")
             if lon_min < -180 or lon_max > 180:
                 print(f"    ❌ Longitude out of range (-180 to 180)")
+                print(f"    💡 Hint: Check if latitude/longitude columns are swapped")
                 return False
 
-            print(f"    ✅ Coordinates are valid!")
+            # Additional validation: Check if coordinates are all zeros (common error)
+            if lat_min == lat_max == 0 and lon_min == lon_max == 0:
+                print(f"    ⚠️ Warning: All coordinates are (0, 0) - likely invalid data")
+                return False
+
+            print(f"    ✅ Coordinates are valid! ({len(valid_lat)} valid points)")
             return True
 
         except Exception as e:
@@ -625,6 +734,34 @@ class DataHelper:
             import traceback
             traceback.print_exc()
             return False
+
+    @staticmethod
+    def create_folium_map(
+        df: pd.DataFrame,
+        map_type: str = "auto"
+    ) -> Optional[folium.Map]:
+        """
+        Create an interactive Folium map from geographic data.
+
+        Args:
+            df: DataFrame with geographic data (lat/lon columns)
+            map_type: Type of map ('auto', 'point', 'heatmap')
+
+        Returns:
+            Folium Map object or None if mapping not possible
+        """
+        map_helper = MapHelper()
+
+        # Check if we can create a map
+        can_map, reason = map_helper.can_create_map(df)
+        if not can_map:
+            print(f"❌ Cannot create map: {reason}")
+            return None
+
+        # Auto-create map based on data
+        folium_map = map_helper.auto_create_map(df, map_type=map_type)
+
+        return folium_map
 
     @staticmethod
     def summarize_dataframe(df: pd.DataFrame) -> Dict:

@@ -12,10 +12,20 @@ def display_messages():
                 st.caption("📝 Generated SQL:")
                 st.code(message["code"], language="sql")
 
-            # Display visualization if present
+            # Display Folium map if present
+            if "folium_map" in message and message["folium_map"]:
+                st.components.v1.html(
+                    message["folium_map"],
+                    height=600,
+                    scrolling=True
+                )
+
+            # Display Plotly visualization if present
             if "chart_data" in message:
                 st.plotly_chart(message["chart_data"], use_container_width=True)
 
-            # Display table if present
+            # Display table if present (skip if Folium map shown)
             if "table_data" in message and not message["table_data"].empty:
-                st.dataframe(message["table_data"], use_container_width=True)
+                # Only show table if not a map visualization
+                if "folium_map" not in message:
+                    st.dataframe(message["table_data"], use_container_width=True)
