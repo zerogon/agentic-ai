@@ -7,6 +7,7 @@ from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
 from utils.route_helper import RouteHelper
 from utils.llm_helper import LLMHelper
+from utils.loading_helper import display_loading_video, remove_loading_video
 from ui.session import update_current_session_messages
 from core.config import get_space_id_by_domain
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -240,8 +241,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 # Use Routing Model to analyze query with streaming
                 router = RouteHelper()
 
-                # Show loading spinner
-                with st.spinner("🔍 Analyzing query..."):
+                # Show spinner during routing analysis
+                with st.spinner("Analyzing your query..."):
                     # Collect streamed content (hidden from user)
                     streamed_text = ""
                     for chunk in router.analyze_query(prompt, stream=True):
@@ -363,6 +364,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             domain_container.caption(displayed_domain)
                             time.sleep(0.03)
 
+                        # Show loading video before routing details
+                        details_loading_container, details_video_id = display_loading_video(width=600, loop=True)
+
                         # Detailed routing analysis (for debugging) with streaming
                         with st.expander("🔍 Routing Details", expanded=False):
                             # Stream intents
@@ -391,6 +395,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 displayed_keywords += char
                                 keywords_container.markdown(displayed_keywords)
                                 time.sleep(0.01)
+
+                        # Remove loading video after routing details complete
+                        remove_loading_video(details_loading_container, details_video_id)
                     else:
                         selected_space_id = genie_space_id
                         st.warning("⚠️ No specific domain detected, using default Genie")
@@ -403,11 +410,12 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                 # Execute Genie query - single or multi-domain
                 if is_multi_domain:
-                    # Multi-domain parallel execution with spinner
-                    with st.spinner("🔄 Processing queries..."):
-                        # Prepare parallel tasks
-                        tasks = []
-                        with ThreadPoolExecutor(max_workers=2) as executor:
+                    # Multi-domain parallel execution with loading video
+                    query_loading_container, query_video_id = display_loading_video(width=600, loop=True)
+
+                    # Prepare parallel tasks
+                    tasks = []
+                    with ThreadPoolExecutor(max_workers=2) as executor:
                             for domain in ["SALES_GENIE", "CONTRACT_GENIE"]:
                                 if domain in genie_domains:
                                     space_id = get_space_id_by_domain(domain)
@@ -424,6 +432,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             for future, domain in tasks:
                                 result = future.result()
                                 genie_results[domain] = result
+
+                    # Remove loading video with fadeout effect
+                    remove_loading_video(query_loading_container, query_video_id)
 
                     # Process results
                     for domain in ["SALES_GENIE", "CONTRACT_GENIE"]:
@@ -608,7 +619,10 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     # Single-domain execution with progress tracking
                     genie = GenieHelper(w, selected_space_id)
 
-                    # Create status container for progress
+                    # Show loading video
+                    single_loading_container, single_video_id = display_loading_video(width=600, loop=True)
+
+                    # Create status container for progress (hidden initially)
                     status_container = st.status("Processing query...", expanded=False)
 
                     # Progress callback
@@ -631,6 +645,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             result = genie.start_conversation(prompt)
 
                         if result["success"]:
+                            # Remove loading video with fadeout effect
+                            remove_loading_video(single_loading_container, single_video_id)
+
                             # Store conversation ID (both legacy and new format)
                             st.session_state.conversation_id = result["conversation_id"]
                             if genie_domains and len(genie_domains) > 0:
@@ -781,6 +798,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Update session after all messages processed
                             update_current_session_messages()
                         else:
+                            # Remove loading video with fadeout effect on error
+                            remove_loading_video(single_loading_container, single_video_id)
+
                             error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
                             st.error(error_msg)
                             st.session_state.messages.append({

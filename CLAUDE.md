@@ -64,6 +64,11 @@ All business logic is in `utils/` as standalone helper classes:
    - `_generate_llm_analysis()` - LLM-based business insights in Korean
    - `generate_report_preview()` - Preview statistics before generation
 
+7. **`loading_helper.py`**: Loading video display during query processing
+   - `display_loading_video()` - Display looping video during async operations
+   - `remove_loading_video()` - Remove loading video after completion
+   - Uses `static/test.mp4` for visual feedback during query processing
+
 ### State Management
 
 **Session state keys** (in `st.session_state`):
@@ -292,6 +297,7 @@ When discussing code locations, use these patterns:
 - `utils/report_helper.py:68` - PDF generation method with Korean font support
 - `utils/report_generator.py:15` - Business report generation
 - `utils/route_helper.py:10` - Multi-Genie routing logic
+- `utils/loading_helper.py:10` - Loading video display and removal
 - `core/config.py:31` - Genie Space configuration
 - `core/message_handler.py` - Chat message processing
 
@@ -338,3 +344,15 @@ When discussing code locations, use these patterns:
 - **Known Issues Fixed**:
   - Korean text encoding in PDF (resolved with TTFont registration)
   - Download button disappearance (resolved with session state caching)
+
+### Loading Video Integration (2024)
+- **Purpose**: Provide visual feedback during query processing with looping video
+- **Implementation**: `utils/loading_helper.py` + `core/message_handler.py` integration
+- **Features**:
+  - Displays `static/test.mp4` during async operations
+  - Automatic video removal after query completion or error
+  - Integrated into routing analysis, multi-domain queries, and single-domain queries
+  - Base64 encoding for reliable video delivery
+  - Configurable width and loop behavior
+- **Usage**: Automatically activated during query processing phases
+- **Testing**: Run `streamlit run test_loading_video.py` to verify functionality
