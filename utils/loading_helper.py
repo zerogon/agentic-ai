@@ -40,16 +40,23 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 20px 0;
+            margin: 10px 0;
             opacity: 1;
             transition: opacity 0.5s ease-out;
         }}
         #{video_id}.fadeout {{
             opacity: 0;
         }}
+        #{video_id} video {{
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 2px solid rgba(0, 0, 0, 0.05);
+            outline: none;
+        }}
     </style>
     <div id="{video_id}">
-        <video width="{width}" autoplay muted {loop_attr} playsinline style="border-radius: 10px;">
+        <video width="{width}" autoplay muted {loop_attr} playsinline>
             <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
             Your browser does not support the video tag.
         </video>

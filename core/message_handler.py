@@ -273,6 +273,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             plan_container.markdown(displayed_text)
                             time.sleep(0.05)  # Delay for typing effect
 
+                    # Show loading video immediately after typing effect completes
+                    analysis_loading_container, analysis_video_id = display_loading_video(width=600, loop=True)
+
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]
 
@@ -307,9 +310,6 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         "SALES_GENIE" in genie_domains and
                         "CONTRACT_GENIE" in genie_domains
                     )
-
-                    # Show loading video after analysis plan
-                    analysis_loading_container, analysis_video_id = display_loading_video(width=600, loop=True)
 
                     # Branch: Use previous data for INSIGHT_REPORT (no new Genie query)
                     if needs_insight_report and has_previous_data and not genie_domains:
