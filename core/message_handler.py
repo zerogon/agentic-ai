@@ -308,6 +308,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         "CONTRACT_GENIE" in genie_domains
                     )
 
+                    # Show loading video after analysis plan
+                    analysis_loading_container, analysis_video_id = display_loading_video(width=600, loop=True)
+
                     # Branch: Use previous data for INSIGHT_REPORT (no new Genie query)
                     if needs_insight_report and has_previous_data and not genie_domains:
                         st.caption("🔄 Analyzing previous query results...")
@@ -323,6 +326,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                         # Stream LLM analysis and get result
                         llm_result = analyze_data_with_llm(w, prompt, previous_data_list, stream_container=insight_container)
+
+                        # Remove loading video after LLM analysis
+                        remove_loading_video(analysis_loading_container, analysis_video_id)
 
                         if llm_result["success"]:
                             insight_text = llm_result["content"]
@@ -344,60 +350,12 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         update_current_session_messages()
 
                     elif genie_domains:
-                        # Stream domain selection message
+                        # Determine selected space ID (but don't display domain selection message)
                         if is_multi_domain:
-                            domain_msg = f"🎯 Using multiple Genies: {', '.join(genie_domains)}"
                             selected_space_id = None  # Not used in multi-domain mode
                         else:
                             selected_domain = genie_domains[0]
                             selected_space_id = get_space_id_by_domain(selected_domain)
-                            domain_msg = f"🎯 Using {selected_domain} for this query"
-
-                        # Stream domain message
-                        domain_container = st.empty()
-                        displayed_domain = ""
-                        domain_words = domain_msg.split()
-                        for i, word in enumerate(domain_words):
-                            displayed_domain += word
-                            if i < len(domain_words) - 1:
-                                displayed_domain += " "
-                            domain_container.caption(displayed_domain)
-                            time.sleep(0.03)
-
-                        # Show loading video before routing details
-                        details_loading_container, details_video_id = display_loading_video(width=600, loop=True)
-
-                        # Detailed routing analysis (for debugging) with streaming
-                        with st.expander("🔍 Routing Details", expanded=False):
-                            # Stream intents
-                            intents_text = f"**Intents:** {', '.join(routing_result['intents'])}"
-                            intents_container = st.empty()
-                            displayed_intents = ""
-                            for char in intents_text:
-                                displayed_intents += char
-                                intents_container.markdown(displayed_intents)
-                                time.sleep(0.01)
-
-                            # Stream genie domains
-                            domains_text = f"**Genie Domains:** {', '.join(routing_result['genie_domain'])}"
-                            domains_container = st.empty()
-                            displayed_domains = ""
-                            for char in domains_text:
-                                displayed_domains += char
-                                domains_container.markdown(displayed_domains)
-                                time.sleep(0.01)
-
-                            # Stream keywords
-                            keywords_text = f"**Keywords:** {', '.join(routing_result['keywords'])}"
-                            keywords_container = st.empty()
-                            displayed_keywords = ""
-                            for char in keywords_text:
-                                displayed_keywords += char
-                                keywords_container.markdown(displayed_keywords)
-                                time.sleep(0.01)
-
-                        # Remove loading video after routing details complete
-                        remove_loading_video(details_loading_container, details_video_id)
                     else:
                         selected_space_id = genie_space_id
                         st.warning("⚠️ No specific domain detected, using default Genie")
@@ -410,8 +368,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                 # Execute Genie query - single or multi-domain
                 if is_multi_domain:
-                    # Multi-domain parallel execution with loading video
-                    query_loading_container, query_video_id = display_loading_video(width=600, loop=True)
+                    # Multi-domain parallel execution (loading video already displayed after analysis plan)
 
                     # Prepare parallel tasks
                     tasks = []
@@ -434,7 +391,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 genie_results[domain] = result
 
                     # Remove loading video with fadeout effect
-                    remove_loading_video(query_loading_container, query_video_id)
+                    remove_loading_video(analysis_loading_container, analysis_video_id)
 
                     # Process results
                     for domain in ["SALES_GENIE", "CONTRACT_GENIE"]:
@@ -616,11 +573,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     update_current_session_messages()
 
                 else:
-                    # Single-domain execution with progress tracking
+                    # Single-domain execution with progress tracking (loading video already displayed after analysis plan)
                     genie = GenieHelper(w, selected_space_id)
-
-                    # Show loading video
-                    single_loading_container, single_video_id = display_loading_video(width=600, loop=True)
 
                     # Create status container for progress (hidden initially)
                     status_container = st.status("Processing query...", expanded=False)
@@ -646,7 +600,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                         if result["success"]:
                             # Remove loading video with fadeout effect
-                            remove_loading_video(single_loading_container, single_video_id)
+                            remove_loading_video(analysis_loading_container, analysis_video_id)
 
                             # Store conversation ID (both legacy and new format)
                             st.session_state.conversation_id = result["conversation_id"]
@@ -799,7 +753,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             update_current_session_messages()
                         else:
                             # Remove loading video with fadeout effect on error
-                            remove_loading_video(single_loading_container, single_video_id)
+                            remove_loading_video(analysis_loading_container, analysis_video_id)
 
                             error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
                             st.error(error_msg)
