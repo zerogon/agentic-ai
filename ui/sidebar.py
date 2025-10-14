@@ -9,7 +9,7 @@ def render_sidebar():
     """Render the sidebar with chat history, search, and controls."""
     with st.sidebar:
         # Header with title and message count
-        st.markdown('<div class="sidebar-header">Databricks Chat</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-header">SK Shieldus Chat</div>', unsafe_allow_html=True)
 
         total_messages = len(st.session_state.get("messages", []))
         if total_messages > 0:

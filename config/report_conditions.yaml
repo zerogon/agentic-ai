@@ -1,0 +1,67 @@
+# Report Generation Condition Configuration
+# Defines requirements for each report type to ensure data quality and completeness
+
+report_conditions:
+  monthly_sales:
+    description: "월간 매출 리포트 - 매출, 이익률, 지역별 분석"
+    required_tables:
+      - "sales_summary"
+      - "profit_margin"
+    required_columns:
+      sales_summary: ["month", "region", "sales"]
+      profit_margin: ["region", "margin"]
+    min_rows: 10
+    freshness_days: 7
+    required_period: "month"
+    genie_domains: ["SALES_GENIE"]
+
+  customer_analysis:
+    description: "고객 분석 리포트 - 고객 정보 및 계약 현황"
+    required_tables:
+      - "customer_info"
+      - "contracts"
+    required_columns:
+      customer_info: ["customer_id", "segment"]
+      contracts: ["contract_id", "status"]
+    min_rows: 50
+    freshness_days: 30
+    required_period: null
+    genie_domains: ["CONTRACT_GENIE"]
+
+  regional_performance:
+    description: "지역별 성과 리포트 - 지역별 매출 및 계약 현황"
+    required_tables:
+      - "region_summary"
+      - "sales_by_region"
+    required_columns:
+      region_summary: ["region_id", "region_name", "cluster"]
+      sales_by_region: ["region_id", "sales", "contracts"]
+    min_rows: 5
+    freshness_days: 14
+    required_period: null
+    genie_domains: ["REGION_GENIE", "SALES_GENIE"]
+
+  comprehensive_business:
+    description: "종합 비즈니스 리포트 - 매출, 계약, 지역 통합 분석"
+    required_tables:
+      - "sales_summary"
+      - "contracts"
+      - "region_summary"
+    required_columns:
+      sales_summary: ["month", "region", "sales"]
+      contracts: ["contract_id", "status", "customer_id"]
+      region_summary: ["region_id", "region_name"]
+    min_rows: 20
+    freshness_days: 7
+    required_period: "month"
+    genie_domains: ["SALES_GENIE", "CONTRACT_GENIE", "REGION_GENIE"]
+
+# Default fallback condition for unspecified report types
+default_condition:
+  description: "기본 리포트 조건"
+  required_tables: []
+  required_columns: {}
+  min_rows: 1
+  freshness_days: 30
+  required_period: null
+  genie_domains: []

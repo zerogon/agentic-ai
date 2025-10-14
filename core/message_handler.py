@@ -8,6 +8,7 @@ from utils.data_helper import DataHelper
 from utils.route_helper import RouteHelper
 from utils.llm_helper import LLMHelper
 from utils.loading_helper import display_loading_video, remove_loading_video
+from utils.report_validation_helper import validate_report_generation, display_validation_result
 from ui.session import update_current_session_messages
 from core.config import get_space_id_by_domain
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -272,6 +273,39 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Update display
                             plan_container.markdown(displayed_text)
                             time.sleep(0.05)  # Delay for typing effect
+
+                    # Check for REPORT_GENERATION intent
+                    needs_report_generation = "REPORT_GENERATION" in routing_result.get("intents", [])
+                    report_type = routing_result.get("report_type")
+
+                    # If report generation is requested, validate conditions first
+                    if needs_report_generation and report_type:
+                        st.markdown("### 🔍 Report Generation Validation")
+
+                        # Get Genie domains for this report
+                        genie_domains_for_report = routing_result.get("genie_domain", [])
+
+                        # Validate report generation conditions
+                        validation_result = validate_report_generation(
+                            w=w,
+                            report_type=report_type,
+                            genie_domains=genie_domains_for_report
+                        )
+
+                        # Display validation result
+                        can_generate = display_validation_result(validation_result)
+
+                        if not can_generate:
+                            # Cannot generate report, show guidance and stop
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": f"⚠️ **Report Generation Blocked**\n\n{validation_result.get('message', 'Cannot generate report due to missing data.')}"
+                            })
+                            update_current_session_messages()
+                            st.stop()
+                        else:
+                            # Conditions satisfied, proceed with report generation
+                            st.success("✅ All conditions satisfied! Proceeding with report generation...")
 
                     # Show loading video immediately after typing effect completes
                     analysis_loading_container, analysis_video_id = display_loading_video(width=600, loop=True)

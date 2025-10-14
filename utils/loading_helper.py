@@ -50,9 +50,10 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
         }}
         #{video_id} video {{
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 2px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(91, 143, 212, 0.3);
             outline: none;
+            background: rgba(32, 35, 42, 0.3);
         }}
     </style>
     <div id="{video_id}">

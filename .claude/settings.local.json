@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__sequential-thinking__sequentialthinking",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
