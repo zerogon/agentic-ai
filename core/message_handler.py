@@ -107,7 +107,7 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
 
         # Get LLM endpoint from secrets or use default
         if not llm_endpoint:
-            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
         # Use streaming if container provided
         if stream_container:
@@ -548,7 +548,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         insight_container = st.empty()
 
                         # Get LLM endpoint
-                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
                         # Stream and get final result
                         llm_result = analyze_data_with_llm(w, prompt, data_list, llm_endpoint, stream_container=insight_container)
@@ -728,7 +728,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 insight_container = st.empty()
 
                                 # Get LLM endpoint
-                                llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-claude-3-7-sonnet")
+                                llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
                                 # Stream and get final result
                                 llm_result = analyze_data_with_llm(w, prompt, data_list, llm_endpoint, stream_container=insight_container)

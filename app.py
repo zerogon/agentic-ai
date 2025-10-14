@@ -14,7 +14,7 @@ from core.message_handler import handle_chat_input
 
 # Page configuration
 st.set_page_config(
-    page_title="Databricks Data Chat",
+    page_title="SK Shieldus Chat Bot",
     page_icon="💬",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -31,7 +31,7 @@ apply_custom_styles()
 render_sidebar()
 
 # Main header
-st.markdown('<div class="main-header">💬 Databricks Data Chat</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">💬 SK Shieldus Chat Bot</div>', unsafe_allow_html=True)
 st.markdown("Ask questions about your data in natural language and get instant insights.")
 st.divider()
 

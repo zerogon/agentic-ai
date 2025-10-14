@@ -204,7 +204,7 @@ Guidelines:
         if not llm_endpoint:
             llm_endpoint = st.secrets.get("databricks", {}).get(
                 "llm_endpoint",
-                "databricks-claude-3-7-sonnet"
+                "databricks-meta-llama-3-3-70b-instruct"
             )
 
         # Generate analysis
