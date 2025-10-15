@@ -356,3 +356,22 @@ When discussing code locations, use these patterns:
   - Configurable width and loop behavior
 - **Usage**: Automatically activated during query processing phases
 - **Testing**: Run `streamlit run test_loading_video.py` to verify functionality
+
+### Polygon Map Visualization (2024)
+- **Purpose**: Visualize geographic boundary data (polygons) from REGION_GENIE queries
+- **Implementation**: `utils/map_helper.py` polygon map support + automatic geometry detection
+- **Features**:
+  - WKT format support (e.g., `POLYGON((lng lat, ...))`)
+  - GeoJSON format support (e.g., `{"type": "Polygon", "coordinates": [...]}`)
+  - Automatic geometry column detection
+  - Choropleth-style coloring based on numeric values
+  - Interactive popups with region information
+  - Automatic name/value column detection
+  - Seamless integration with existing point map functionality
+- **Usage**: Automatically activated when REGION_GENIE returns data with `geometry` column
+- **Testing**: Run `python test_polygon_map.py` to verify functionality
+- **Technical Details**:
+  - Uses Folium GeoJson for rendering
+  - Shapely for WKT/GeoJSON parsing
+  - GeoPandas for polygon data handling
+  - Priority: Geometry columns → Lat/Lon columns → Other map types

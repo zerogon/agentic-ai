@@ -135,6 +135,11 @@ The app supports **multiple AI backends** that can be switched via the UI:
 - Auto-detect best chart type
 - Bar, Line, Pie, Scatter, Heatmap charts
 - Interactive Plotly visualizations
+- Geographic data visualization:
+  - Point maps (lat/lon coordinates)
+  - Polygon maps (WKT/GeoJSON boundaries)
+  - Choropleth coloring based on values
+  - Interactive Folium maps with popups
 - Data table display
 
 ### Coming Soon

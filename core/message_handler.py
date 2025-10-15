@@ -71,7 +71,7 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
 
 4. 출력은 ChatGPT 답변처럼 자연스럽고 가독성 높은 구조로 제공한다.  
    - 구분선(---) 사용  
-   - 섹션별 제목에 적절한 이모티콘 사용  
+   - 섹션별 제목에 적절한 이모티콘 반드시 사용  
    - 문장 간 간격과 톤은 “격식 + 명확함 + 간결함”  
 
 ---
@@ -85,6 +85,16 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
 - 수치 위주로 설명하되, 인간적 맥락으로 연결한다.  
 - 문장 길이는 2줄 이하로 유지해 가독성을 확보한다.  
 
+---
+
+### <output>
+출력은 아래 형식을 따른다:
+
+📊 Summary 
+(요약 내용)
+
+📈 Analysis 
+(분석 내용)
 ---
 
 ### <urgency>
