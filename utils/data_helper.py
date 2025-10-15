@@ -448,21 +448,14 @@ class DataHelper:
         if df.empty:
             return "bar"
 
-        # Debug logging
-        print(f"🔍 Auto-detecting chart type for DataFrame:")
-        print(f"  - Columns: {df.columns.tolist()}")
-        print(f"  - Shape: {df.shape}")
-
         # Check for map data first (latitude/longitude columns)
         lat_col, lon_col, _ = DataHelper._detect_map_columns(df)
-        print(f"  - Map column detection: lat={lat_col}, lon={lon_col}")
+
 
         if lat_col and lon_col:
             # Validate coordinates
             is_valid = DataHelper._validate_coordinates(df, lat_col, lon_col)
-            print(f"  - Coordinate validation: {is_valid}")
             if is_valid:
-                print(f"✅ Auto-detected chart type: MAP")
                 return "map"
 
         # Count numeric vs categorical columns
@@ -471,21 +464,17 @@ class DataHelper:
 
         # If mostly numeric, use line or scatter
         if len(numeric_cols) >= 2:
-            print(f"✅ Auto-detected chart type: SCATTER (numeric columns: {len(numeric_cols)})")
             return "scatter"
 
         # If one categorical and one numeric, use bar
         if len(categorical_cols) >= 1 and len(numeric_cols) >= 1:
-            print(f"✅ Auto-detected chart type: BAR (categorical + numeric)")
             return "bar"
 
         # If mostly categorical, use bar
         if len(categorical_cols) > 0:
-            print(f"✅ Auto-detected chart type: BAR (categorical only)")
             return "bar"
 
         # Default
-        print(f"✅ Auto-detected chart type: BAR (default)")
         return "bar"
 
     @staticmethod
@@ -550,7 +539,6 @@ class DataHelper:
                             # Check if values are in valid latitude range
                             if -90 <= min_val <= 90 and -90 <= max_val <= 90:
                                 lat_col = col
-                                print(f"  🎯 Detected latitude column: '{col}' (exact match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
                                 break
                     except:
                         pass
@@ -571,7 +559,6 @@ class DataHelper:
                                 # Check if values are in valid latitude range
                                 if -90 <= min_val <= 90 and -90 <= max_val <= 90:
                                     lat_col = col
-                                    print(f"  🎯 Detected latitude column: '{col}' (partial match: '{cand}', range: {min_val:.2f} to {max_val:.2f})")
                                     break
                         except:
                             pass
