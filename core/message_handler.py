@@ -7,7 +7,7 @@ from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
 from utils.route_helper import RouteHelper
 from utils.llm_helper import LLMHelper
-from utils.loading_helper import display_loading_video, remove_loading_video
+from utils.loading_helper import display_loading_video, remove_loading_video, update_loading_message
 from ui.session import update_current_session_messages
 from core.config import get_space_id_by_domain
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -49,7 +49,7 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
         analysis_messages = [
             {
                 "role": "system",
-                "content": """### <role>
+                "content": """<role>
 너는 **데이터 분석가(Data Analyst)**이자, 동시에 **쉬운 해설자(Easy Explainer)**다.  
 너의 임무는 복잡한 데이터의 의미를 일반인도 이해할 수 있게 설명하는 것이다.  
 분석 대상은 전문 독자가 아니라, “데이터에 익숙하지 않은 일반인”이다.  
@@ -69,11 +69,6 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
 3. 분석이 어렵거나 뚜렷한 특징이 없는 경우,  
    “이번 데이터에서는 뚜렷한 변화가 보이지 않습니다.” 정도로 간단히 마무리한다.  
 
-4. 출력은 ChatGPT 답변처럼 자연스럽고 가독성 높은 구조로 제공한다.  
-   - 구분선(---) 사용  
-   - 섹션별 제목에 적절한 이모티콘 반드시 사용  
-   - 문장 간 간격과 톤은 “격식 + 명확함 + 간결함”  
-
 ---
 
 ### <rules>
@@ -88,13 +83,12 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
 ---
 
 ### <output>
-출력은 아래 형식을 따른다:
 
-📊 Summary 
-(요약 내용)
-
-📈 Analysis 
-(분석 내용)
+출력은 ChatGPT 답변처럼 자연스럽고 가독성 높은 구조로 제공한다.  
+   - 섹션은 summary과 analysis 만 사용한다.
+   - 내용이 길어질 경우 적절한 구분선(---) 사용  
+   - 섹션별 적절한 이모티콘 반드시 사용한다.
+   - 문장 간 간격과 톤은 “격식 + 명확함 + 간결함”  
 ---
 
 ### <urgency>
@@ -279,8 +273,12 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             plan_container.markdown(displayed_text)
                             time.sleep(0.05)  # Delay for typing effect
 
-                    # Show loading video immediately after typing effect completes
-                    analysis_loading_container, analysis_video_id = display_loading_video(width=600, loop=True)
+                    # Show loading video with initial message immediately after typing effect completes
+                    analysis_loading_container, analysis_video_id, analysis_message_id = display_loading_video(
+                        width=600,
+                        loop=True,
+                        message="🔍 Analyzing query"
+                    )
 
                     # Select Genie Space based on routing result
                     genie_domains = routing_result["genie_domain"]
@@ -374,6 +372,13 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 # Execute Genie query - single or multi-domain
                 if is_multi_domain:
                     # Multi-domain parallel execution (loading video already displayed after analysis plan)
+                    # Update loading message for multi-domain execution
+                    update_loading_message(
+                        analysis_loading_container,
+                        analysis_video_id,
+                        analysis_message_id,
+                        "⚙️ Collecting data from multiple domains"
+                    )
 
                     # Prepare parallel tasks
                     tasks = []
@@ -578,6 +583,14 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                 else:
                     # Single-domain execution with progress tracking (loading video already displayed after analysis plan)
+                    # Update loading message for single-domain execution
+                    update_loading_message(
+                        analysis_loading_container,
+                        analysis_video_id,
+                        analysis_message_id,
+                        "📊 Executing query"
+                    )
+
                     genie = GenieHelper(w, selected_space_id)
 
                     # Create status container for progress (hidden initially)
@@ -603,6 +616,15 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             result = genie.start_conversation(prompt)
 
                         if result["success"]:
+                            # Update loading message before removing video
+                            update_loading_message(
+                                analysis_loading_container,
+                                analysis_video_id,
+                                analysis_message_id,
+                                "✅ Complete"
+                            )
+                            time.sleep(0.3)  # Brief pause to show completion message
+
                             # Remove loading video with fadeout effect
                             remove_loading_video(analysis_loading_container, analysis_video_id)
 
