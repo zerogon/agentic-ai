@@ -41,6 +41,25 @@ def apply_custom_styles():
         background: linear-gradient(135deg, rgba(52, 211, 153, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%) !important;
         border-left: 3px solid #4db89d;
     }
+    /* Avatar styling for dark theme */
+    [data-testid="stChatMessageAvatarUser"],
+    [data-testid="chatAvatarIcon-user"],
+    .stChatMessage[data-testid="user"] svg,
+    .stChatMessage[data-testid="user"] [class*="Avatar"] {
+        background-color: #6366f1 !important;
+        background: #6366f1 !important;
+        color: #ffffff !important;
+        fill: #ffffff !important;
+    }
+    [data-testid="stChatMessageAvatarAssistant"],
+    [data-testid="chatAvatarIcon-assistant"],
+    .stChatMessage[data-testid="assistant"] svg,
+    .stChatMessage[data-testid="assistant"] [class*="Avatar"] {
+        background-color: #475569 !important;
+        background: #475569 !important;
+        color: #e2e8f0 !important;
+        fill: #e2e8f0 !important;
+    }
     .main-header {
         font-size: 2.25rem;
         font-weight: 700;

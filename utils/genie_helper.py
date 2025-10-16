@@ -46,14 +46,11 @@ class GenieHelper:
             Conversation response object
         """
         try:
-            self._update_progress("🔍", "Analyzing query...")
 
             conversation = self.w.genie.start_conversation_and_wait(
                 self.genie_space_id,
                 prompt
             )
-
-            self._update_progress("✅", "Query complete")
 
             return {
                 "conversation_id": conversation.conversation_id,
@@ -145,6 +142,7 @@ class GenieHelper:
 
             if attachment.text:
                 message["content"] = attachment.text.content
+                print("01",message["content"])
                 message["type"] = "text"
                 messages.append(message)
 
@@ -153,6 +151,7 @@ class GenieHelper:
                 data = self.get_query_result(response.query_result.statement_id)
 
                 message["content"] = attachment.query.description or "Query executed successfully"
+                print("02",message["content"])
                 message["data"] = data
                 message["code"] = attachment.query.query
                 message["type"] = "query"
