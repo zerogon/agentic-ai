@@ -15,8 +15,7 @@ databricks/
 │   ├── llm_helper.py      # LLM endpoint utilities
 │   └── data_helper.py     # Data processing utilities
 ├── SPEC.md            # Project specification
-├── README.md          # This file
-└── .archived/         # Previous backend/frontend structure (archived)
+└── README.md          # This file
 ```
 
 ## 🚀 Databricks Apps Deployment

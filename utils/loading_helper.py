@@ -87,7 +87,7 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
             Your browser does not support the video tag.
         </video>
-        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 20px 30px; border-radius: 12px; font-size: 18px; font-weight: 600; text-align: center; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite;">
+        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 12px; font-size: 18px; font-weight: 600; text-align: center; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite;">
             <span class="loading-dots">{message if message else ""}</span>
         </div>
     </div>

@@ -33,21 +33,17 @@ def init_session_state(ai_mode: str):
 def create_new_session(ai_mode: str):
     """Create a new chat session."""
     session_id = str(uuid.uuid4())
-    welcome_message = {
-        "role": "assistant",
-        "content": f"Hello! I'm your Databricks data assistant running in **{ai_mode}** mode. Ask me anything about your data, and I'll help you with queries, visualizations, and reports."
-    }
 
     new_session = {
         "id": session_id,
         "created_at": datetime.now(),
-        "messages": [welcome_message],
+        "messages": [],  # Start with empty messages to show landing page
         "first_user_message": None  # Will be set when user sends first message
     }
 
     st.session_state.chat_sessions.insert(0, new_session)  # Add to beginning
     st.session_state.current_session_id = session_id
-    st.session_state.messages = [welcome_message]
+    st.session_state.messages = []  # Empty messages to trigger landing page
 
     # Clear Genie conversation IDs for new session
     if "conversation_ids" in st.session_state:
