@@ -5,7 +5,9 @@ def display_messages():
     """Display chat messages from session state."""
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            # Only show content for user messages, skip for assistant (Genie responses)
+            if message["role"] == "user":
+                st.markdown(message["content"])
 
             # Display SQL code if present (without expander to avoid nesting)
             if "code" in message and message["code"]:

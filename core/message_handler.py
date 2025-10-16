@@ -14,6 +14,7 @@ from prompts.manager import load_prompt
 def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None, stream_container=None):
     """
     Analyze data using LLM and generate insights with streaming support.
+    Supports inq-based dynamic prompt selection.
 
     Args:
         w: WorkspaceClient instance
@@ -26,81 +27,93 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
         Dict with success, content, and error keys
     """
     try:
-        # Prepare data summary for LLM
-        data_summary = f"Original Query: {prompt}\n\n"
+        from utils.prompt_selector import group_data_by_inq, get_prompt_by_inq, merge_analysis_results
 
-        for item in data_list:
-            domain = item.get("domain", "UNKNOWN")
-            df = item.get("data")
-            content = item.get("content", "")
 
-            if df is not None and not df.empty:
-                data_summary += f"--- {domain} ---\n"
-                if content:
-                    data_summary += f"Context: {content}\n"
-                data_summary += f"\nData Preview ({len(df)} rows):\n"
-                data_summary += df.head(10).to_string() + "\n\n"
+        # Group data by inq values
+        grouped_data = group_data_by_inq(data_list)
 
-        # Call LLM for insight analysis
-        llm_helper = LLMHelper(workspace_client=w, provider="databricks")
-
-        # Load system prompt from prompts management system
-        system_prompt = load_prompt("data_analyst")
-
-        analysis_messages = [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": data_summary
-            }
-        ]
 
         # Get LLM endpoint from secrets or use default
         if not llm_endpoint:
             llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
-        # Use streaming if container provided
-        if stream_container:
-            full_response = ""
-            for chunk in llm_helper.chat_completion_stream(
-                endpoint_name=llm_endpoint,
-                messages=analysis_messages,
-                temperature=0.3,
-                max_tokens=2000
-            ):
-                full_response += chunk
-                stream_container.markdown(full_response)
+        # Initialize LLM helper
+        llm_helper = LLMHelper(workspace_client=w, provider="databricks")
 
-            # Return final response after streaming completes
-            return {
-                "success": True,
-                "content": full_response,
-                "error": None
-            }
-        else:
-            # Non-streaming fallback
-            llm_result = llm_helper.chat_completion(
-                endpoint_name=llm_endpoint,
-                messages=analysis_messages,
-                temperature=0.3,
-                max_tokens=2000
-            )
+        # Process each inq group separately
+        inq_results = {}
 
-            if llm_result["success"]:
-                return {
+        for inq_value, group_items in grouped_data.items():
+            # Select appropriate prompt for this inq value
+            prompt_name = get_prompt_by_inq(inq_value)
+            system_prompt = load_prompt(prompt_name)
+
+
+            # Prepare data summary for this group
+            data_summary = f"Original Query: {prompt}\n\n"
+
+            for item in group_items:
+                domain = item.get("domain", "UNKNOWN")
+                df = item.get("data")
+                content = item.get("content", "")
+
+                if df is not None and not df.empty:
+                    data_summary += f"--- {domain} ---\n"
+                    if content:
+                        data_summary += f"Context: {content}\n"
+                    data_summary += f"\nData Preview ({len(df)} rows):\n"
+                    data_summary += df.head(10).to_string() + "\n\n"
+
+            # Prepare messages for this inq group
+            analysis_messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": data_summary
+                }
+            ]
+
+            # Call LLM for this group
+            if stream_container and len(grouped_data) == 1:
+                # Only use streaming if single group (to avoid multiple streams)
+                full_response = ""
+                for chunk in llm_helper.chat_completion_stream(
+                    endpoint_name=llm_endpoint,
+                    messages=analysis_messages,
+                    temperature=0.3,
+                    max_tokens=2000
+                ):
+                    full_response += chunk
+                    stream_container.markdown(full_response)
+
+                inq_results[inq_value] = {
                     "success": True,
-                    "content": llm_result["content"],
+                    "content": full_response,
                     "error": None
                 }
             else:
-                return {
-                    "success": False,
-                    "content": None,
-                    "error": llm_result.get("error", "Unknown error")
-                }
+                # Non-streaming for multiple groups or no stream container
+                llm_result = llm_helper.chat_completion(
+                    endpoint_name=llm_endpoint,
+                    messages=analysis_messages,
+                    temperature=0.3,
+                    max_tokens=2000
+                )
+
+                inq_results[inq_value] = llm_result
+
+        # Merge results from all inq groups
+        merged_result = merge_analysis_results(inq_results)
+
+        # Display merged result if streaming and multiple groups
+        if stream_container and len(grouped_data) > 1 and merged_result["success"]:
+            stream_container.markdown(merged_result["content"])
+
+        return merged_result
 
     except Exception as e:
         return {
@@ -198,7 +211,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         data_for_llm = []
 
                         for msg in messages:
-                            st.markdown(msg["content"])
+                            # Skip displaying content from Genie - only show SQL/charts/tables
+                            # st.markdown(msg["content"])
 
                             if msg.get("type") == "query":
                                 # Show SQL code in collapsible expander
@@ -265,10 +279,10 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                         st.markdown("**📋 Data:**")
                                         st.dataframe(msg["data"], use_container_width=True)
 
-                                    # Add to chat history
+                                    # Add to chat history (without content text)
                                     message_data = {
                                         "role": "assistant",
-                                        "content": msg["content"],
+                                        "content": "",  # Hide content, only show SQL/charts/tables
                                         "code": msg.get("code"),
                                         "table_data": msg["data"],
                                         "domain": "REGION_GENIE"

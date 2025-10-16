@@ -142,7 +142,6 @@ class GenieHelper:
 
             if attachment.text:
                 message["content"] = attachment.text.content
-                print("01",message["content"])
                 message["type"] = "text"
                 messages.append(message)
 
@@ -151,7 +150,6 @@ class GenieHelper:
                 data = self.get_query_result(response.query_result.statement_id)
 
                 message["content"] = attachment.query.description or "Query executed successfully"
-                print("02",message["content"])
                 message["data"] = data
                 message["code"] = attachment.query.query
                 message["type"] = "query"
