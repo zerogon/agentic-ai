@@ -32,32 +32,17 @@ def get_config():
     }
 
 
-def get_genie_spaces():
+def get_space_id_by_domain(domain: str = "REGION_GENIE"):
     """
-    Get Genie Space ID mapping for routing
-
-    Returns:
-        Dict mapping Genie domain names to Space IDs
-    """
-    genie_spaces = st.secrets.get("genie_spaces", {})
-
-    # Convert to regular dict and provide fallback
-    spaces_dict = {
-        "SALES_GENIE": genie_spaces.get("SALES_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID")),
-        "CONTRACT_GENIE": genie_spaces.get("CONTRACT_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID")),
-        "REGION_GENIE": genie_spaces.get("REGION_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))
-    }
-    return spaces_dict
-
-def get_space_id_by_domain(domain: str):
-    """
-    Get Genie Space ID by domain name
+    Get Genie Space ID for REGION_GENIE (simplified - only one domain now)
 
     Args:
-        domain: Genie domain name (e.g., "SALES_GENIE")
+        domain: Genie domain name (default: "REGION_GENIE")
 
     Returns:
-        Genie Space ID for the specified domain
+        Genie Space ID for REGION_GENIE
     """
-    spaces = get_genie_spaces()
-    return spaces.get(domain, st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))
+    # Simplified: Always return REGION_GENIE Space ID
+    genie_spaces = st.secrets.get("genie_spaces", {})
+    region_space_id = genie_spaces.get("REGION_GENIE", st.secrets.get("databricks", {}).get("GENIE_SPACE_ID"))
+    return region_space_id

@@ -46,17 +46,19 @@ All business logic is in `utils/` as standalone helper classes:
    - `auto_detect_chart_type()` - Smart chart type selection
    - `format_sql_code()` - SQL formatting for display
 
-4. **`route_helper.py`**: Multi-Genie routing and domain selection
-   - `extract_keywords()` - Extract query keywords for routing
-   - `determine_genie_domain()` - Determine best Genie Space based on query
-   - Supports multiple Genie Spaces: SALES_GENIE, CONTRACT_GENIE, REGION_GENIE
-
-5. **`report_helper.py`**: Report generation (PDF/HTML)
+4. **`report_helper.py`**: Report generation (PDF/HTML)
    - `generate_pdf()` - ReportLab-based PDF reports with Korean font support
    - `generate_html()` - Jinja2-based HTML reports
    - Accumulate sections with `add_section()`, `add_dataframe()`, `add_chart()`
    - Korean font handling: AppleSDGothicNeo.ttc → AppleGothic.ttf → Helvetica
    - Call `clear()` before building new report
+
+5. **`map_helper.py`**: Geospatial visualization with automatic geometry detection
+   - `auto_create_map()` - Automatically create appropriate map type
+   - `create_point_map()` - Point markers with lat/lon data
+   - `create_polygon_map()` - Polygon/choropleth maps from geometry data
+   - `detect_geo_columns()` - Automatic column detection (lat/lon, geometry)
+   - Priority: Geometry columns → Lat/Lon columns → Other map types
 
 6. **`report_generator.py`**: Business report generation from chat sessions
    - `generate_business_report()` - Generate comprehensive business analysis report
@@ -105,18 +107,20 @@ databricks apps deploy <app-name> --source-code-path .
 
 ## Working with AI Modes
 
-The app supports **AI mode** via Genie API:
+The app uses a **simplified single-Genie architecture**:
 
-### Genie API (Multi-Space Routing)
-- Best for: Data queries (NL2SQL)
-- Requires: `GENIE_SPACE_ID` in secrets or sidebar input
-- Supports multiple Genie Spaces with intelligent routing:
-  - **SALES_GENIE**: Sales data queries
-  - **CONTRACT_GENIE**: Contract and legal data
-  - **REGION_GENIE**: Regional and geographic data
-- Flow: User query → Route to appropriate Genie Space → Generate SQL → Execute → Return DataFrame
-- Maintains conversation context automatically
-- Routing: `route_helper.py` determines best Genie Space based on query keywords
+### Genie API (REGION_GENIE Only)
+- **Best for**: Regional and geographic data queries (NL2SQL)
+- **Requires**: `REGION_GENIE` Space ID in secrets configuration
+- **Simplified Flow**:
+  1. User query → REGION_GENIE (direct, no routing)
+  2. Generate SQL → Execute → Return DataFrame
+  3. **Automatic geometry detection** → Create map if `geometry` column exists
+  4. **Mandatory LLM analysis** → All responses get business insights
+- **Maintains conversation context** automatically per domain
+- **Map Generation**:
+  - Geometry column detected → Folium polygon map
+  - No geometry column → Standard charts/tables
 
 ## Report Generation
 
@@ -296,7 +300,7 @@ When discussing code locations, use these patterns:
 - `utils/llm_helper.py:13` - Multi-provider constructor
 - `utils/report_helper.py:68` - PDF generation method with Korean font support
 - `utils/report_generator.py:15` - Business report generation
-- `utils/route_helper.py:10` - Multi-Genie routing logic
+- `utils/map_helper.py:50` - Geometry parsing and map creation
 - `utils/loading_helper.py:10` - Loading video display and removal
 - `core/config.py:31` - Genie Space configuration
 - `core/message_handler.py` - Chat message processing
@@ -316,8 +320,9 @@ When discussing code locations, use these patterns:
 5. **Remember single-process constraint**: No background workers, no separate API servers
 6. **Session state persistence**: Use `st.session_state` for data that must survive reruns (e.g., generated reports)
 7. **Korean text support**: Register Korean fonts in ReportLab for PDF generation
-8. **Multi-Genie routing**: Use `route_helper.py` to determine appropriate Genie Space based on query keywords
+8. **Simplified architecture**: Direct REGION_GENIE queries with automatic map detection
 9. **Message structure for reports**: Extract conversation data from `messages` list with proper filtering of queries and data
+10. **LLM Analysis**: All data responses now include mandatory LLM business insights
 
 ## UI Components
 
@@ -345,17 +350,31 @@ When discussing code locations, use these patterns:
   - Korean text encoding in PDF (resolved with TTFont registration)
   - Download button disappearance (resolved with session state caching)
 
+### Simplified Architecture (2025)
+- **Purpose**: Streamline query processing by removing routing complexity
+- **Implementation**: Direct REGION_GENIE queries with automatic map and LLM analysis
+- **Key Changes**:
+  - **Router removed**: No more multi-domain routing or query analysis phase
+  - **Single Genie**: All queries go directly to REGION_GENIE
+  - **Auto map detection**: Checks for `geometry` column and creates maps automatically
+  - **Mandatory LLM**: All data responses include LLM business insights
+  - **Code reduction**: ~250 lines removed from message_handler.py
+- **Benefits**:
+  - Faster response times (no router LLM call)
+  - Simpler code maintenance
+  - Enhanced functionality (LLM analysis on all responses)
+  - More predictable behavior
+
 ### Loading Video Integration (2024)
 - **Purpose**: Provide visual feedback during query processing with looping video
 - **Implementation**: `utils/loading_helper.py` + `core/message_handler.py` integration
 - **Features**:
   - Displays `static/test.mp4` during async operations
   - Automatic video removal after query completion or error
-  - Integrated into routing analysis, multi-domain queries, and single-domain queries
+  - Integrated into REGION_GENIE queries
   - Base64 encoding for reliable video delivery
   - Configurable width and loop behavior
 - **Usage**: Automatically activated during query processing phases
-- **Testing**: Run `streamlit run test_loading_video.py` to verify functionality
 
 ### Polygon Map Visualization (2024)
 - **Purpose**: Visualize geographic boundary data (polygons) from REGION_GENIE queries
