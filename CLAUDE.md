@@ -375,3 +375,4 @@ When discussing code locations, use these patterns:
   - Shapely for WKT/GeoJSON parsing
   - GeoPandas for polygon data handling
   - Priority: Geometry columns → Lat/Lon columns → Other map types
+- 별도의 언급이 없는 이상 추가 md파일을 생성하게 하지마

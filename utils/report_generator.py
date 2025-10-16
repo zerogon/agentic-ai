@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 from databricks.sdk import WorkspaceClient
 from utils.llm_helper import LLMHelper
 from utils.report_helper import ReportHelper
+from prompts.manager import load_prompt
 
 
 def generate_business_report(
@@ -176,24 +177,8 @@ def _generate_llm_analysis(
         # Initialize LLM helper
         llm_helper = LLMHelper(workspace_client=w, provider="databricks")
 
-        # System prompt for business report generation
-        system_prompt = """You are a senior business analyst specializing in data-driven insights.
-
-Your task is to analyze conversation data and generate a comprehensive business report in Korean.
-
-Report Structure:
-1. **Executive Summary (경영진 요약)**: High-level overview of key findings
-2. **Analysis Details (분석 상세)**: Detailed analysis of each data query
-3. **Key Insights (주요 인사이트)**: Important patterns, trends, and discoveries
-4. **Business Recommendations (비즈니스 권장사항)**: Actionable recommendations based on data
-5. **Conclusion (결론)**: Final thoughts and next steps
-
-Guidelines:
-- Use professional business language
-- Focus on actionable insights
-- Highlight trends and patterns in data
-- Provide specific, data-backed recommendations
-- Use Korean language throughout the report"""
+        # Load system prompt from prompts management system
+        system_prompt = load_prompt("business_report_analyst")
 
         messages = [
             {"role": "system", "content": system_prompt},
