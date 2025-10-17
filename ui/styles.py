@@ -20,7 +20,6 @@ def apply_custom_styles():
         backdrop-filter: blur(20px);
         border-radius: 1.25rem;
         padding: 1.5rem;
-        margin-top: 1rem;
         border: 1px solid {theme["container_border"]};
         box-shadow: {theme["container_shadow"]};
     }}
@@ -477,10 +476,11 @@ def apply_custom_styles():
         background: {theme["input_focus_background"]} !important;
         border: none !important;
         outline: none !important;
+        box-shadow: {theme["input_focus_shadow"]} !important;
     }}
 
     [data-testid="stChatInput"] textarea::placeholder {{
-        color: {theme["placeholder_text"]} !important;
+        color: {theme["muted_text"]} !important;
     }}
 
     /* Chat input submit button */

@@ -82,20 +82,20 @@ DARK_THEME = {
 
 LIGHT_THEME = {
     "name": "light",
-    "app_background": "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
-    "container_background": "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 249, 250, 0.9) 100%)",
-    "container_border": "rgba(200, 200, 200, 0.3)",
-    "container_shadow": "0 4px 20px rgba(0, 0, 0, 0.08)",
+    "app_background": "#ffffff",
+    "container_background": "#ffffff",
+    "container_border": "rgba(255, 255, 255, 0)",
+    "container_shadow": "none",
 
     # Chat messages
-    "message_background": "rgba(255, 255, 255, 0.8)",
-    "message_border": "rgba(220, 220, 220, 0.4)",
+    "message_background": "#f8f9fa",
+    "message_border": "rgba(220, 220, 220, 0.5)",
     "message_hover_border": "rgba(59, 130, 246, 0.4)",
-    "message_shadow": "0 2px 10px rgba(0, 0, 0, 0.05)",
+    "message_shadow": "0 2px 8px rgba(0, 0, 0, 0.05)",
 
-    "user_message_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
+    "user_message_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%)",
     "user_message_border": "#5b8fd4",
-    "assistant_message_background": "linear-gradient(135deg, rgba(52, 211, 153, 0.12) 0%, rgba(16, 185, 129, 0.06) 100%)",
+    "assistant_message_background": "linear-gradient(135deg, rgba(52, 211, 153, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%)",
     "assistant_message_border": "#4db89d",
 
     # Avatars
@@ -111,50 +111,56 @@ LIGHT_THEME = {
     "muted_text": "#9ca3af",
     "placeholder_text": "#d1d5db",
 
-    # Sidebar
-    "sidebar_background": "linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)",
-    "sidebar_border": "rgba(200, 200, 200, 0.3)",
-    "sidebar_shadow": "2px 0 10px rgba(0, 0, 0, 0.05)",
+    # Sidebar (light theme)
+    "sidebar_background": "linear-gradient(180deg, #f9fafb 0%, #f3f4f6 100%)",
+    "sidebar_border": "rgba(220, 220, 220, 0.4)",
+    "sidebar_shadow": "2px 0 16px rgba(0, 0, 0, 0.08)",
 
-    # Buttons
-    "button_background": "rgba(255, 255, 255, 0.9)",
-    "button_border": "rgba(200, 200, 200, 0.4)",
-    "button_color": "#6b7280",
-    "button_shadow": "0 1px 3px rgba(0, 0, 0, 0.1)",
+    # Buttons (light theme)
+    "button_background": "#ffffff",
+    "button_border": "rgba(220, 220, 220, 0.6)",
+    "button_color": "#374151",
+    "button_shadow": "0 2px 6px rgba(0, 0, 0, 0.05)",
     "button_hover_background": "rgba(59, 130, 246, 0.08)",
-    "button_hover_border": "rgba(91, 143, 212, 0.5)",
-    "button_hover_color": "#374151",
-    "button_hover_shadow": "0 2px 8px rgba(0, 0, 0, 0.15)",
+    "button_hover_border": "rgba(59, 130, 246, 0.3)",
+    "button_hover_color": "#1f2937",
+    "button_hover_shadow": "0 4px 12px rgba(0, 0, 0, 0.1)",
 
-    "primary_button_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.12) 100%)",
-    "primary_button_border": "rgba(91, 143, 212, 0.5)",
+    "primary_button_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
+    "primary_button_border": "rgba(59, 130, 246, 0.4)",
     "primary_button_color": "#2563eb",
-    "primary_button_hover_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.18) 100%)",
-    "primary_button_hover_border": "rgba(91, 143, 212, 0.7)",
-    "primary_button_hover_shadow": "0 4px 12px rgba(59, 130, 246, 0.25)",
+    "primary_button_hover_background": "linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(37, 99, 235, 0.1) 100%)",
+    "primary_button_hover_border": "rgba(59, 130, 246, 0.6)",
+    "primary_button_hover_shadow": "0 4px 16px rgba(59, 130, 246, 0.15)",
 
-    # Inputs
-    "input_background": "rgba(255, 255, 255, 0.95)",
-    "input_border": "rgba(200, 200, 200, 0.4)",
-    "input_focus_border": "rgba(91, 143, 212, 0.6)",
+    # Inputs (light theme)
+    "input_background": "#ffffff",
+    "input_border": "rgba(220, 220, 220, 0.6)",
+    "input_focus_border": "rgba(59, 130, 246, 0.5)",
     "input_focus_background": "#ffffff",
     "input_focus_shadow": "0 0 0 3px rgba(59, 130, 246, 0.1)",
 
-    # Message previews
-    "preview_background": "rgba(255, 255, 255, 0.9)",
-    "preview_border": "rgba(220, 220, 220, 0.4)",
-    "preview_border_left": "#5b8fd4",
-    "preview_shadow": "0 1px 6px rgba(0, 0, 0, 0.08)",
-    "preview_hover_background": "rgba(59, 130, 246, 0.06)",
-    "preview_hover_border_left": "#6b9fe8",
-    "preview_hover_border": "rgba(91, 143, 212, 0.4)",
-    "preview_hover_shadow": "0 3px 12px rgba(0, 0, 0, 0.12)",
+    # Main chat input
+    "chat_input_background": "#ffffff",
+    "chat_input_border": "rgba(220, 220, 220, 0.6)",
+    "chat_input_focus_background": "#ffffff",
+    "chat_input_focus_shadow": "0 0 0 3px rgba(59, 130, 246, 0.1)",
 
-    # Alerts
-    "alert_background": "#eff6ff",
+    # Message previews (light theme)
+    "preview_background": "#ffffff",
+    "preview_border": "rgba(220, 220, 220, 0.5)",
+    "preview_border_left": "#5b8fd4",
+    "preview_shadow": "0 2px 10px rgba(0, 0, 0, 0.06)",
+    "preview_hover_background": "rgba(59, 130, 246, 0.05)",
+    "preview_hover_border_left": "#3b82f6",
+    "preview_hover_border": "rgba(59, 130, 246, 0.3)",
+    "preview_hover_shadow": "0 4px 16px rgba(0, 0, 0, 0.1)",
+
+    # Alerts (light theme)
+    "alert_background": "#f0f9ff",
     "alert_border": "#3b82f6",
     "success_background": "rgba(16, 185, 129, 0.08)",
-    "success_border": "rgba(16, 185, 129, 0.4)",
+    "success_border": "rgba(16, 185, 129, 0.3)",
     "success_border_left": "#10b981",
 }
 
