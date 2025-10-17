@@ -88,7 +88,7 @@ LIGHT_THEME = {
     "container_shadow": "none",
 
     # Chat messages
-    "message_background": "#f8f9fa",
+    "message_background": "#fbfbfbd3",
     "message_border": "rgba(220, 220, 220, 0.5)",
     "message_hover_border": "rgba(59, 130, 246, 0.4)",
     "message_shadow": "0 2px 8px rgba(0, 0, 0, 0.05)",
@@ -139,12 +139,6 @@ LIGHT_THEME = {
     "input_focus_border": "rgba(59, 130, 246, 0.5)",
     "input_focus_background": "#ffffff",
     "input_focus_shadow": "0 0 0 3px rgba(59, 130, 246, 0.1)",
-
-    # Main chat input
-    "chat_input_background": "#ffffff",
-    "chat_input_border": "rgba(220, 220, 220, 0.6)",
-    "chat_input_focus_background": "#ffffff",
-    "chat_input_focus_shadow": "0 0 0 3px rgba(59, 130, 246, 0.1)",
 
     # Message previews (light theme)
     "preview_background": "#ffffff",

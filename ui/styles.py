@@ -19,9 +19,17 @@ def apply_custom_styles():
         background: {theme["container_background"]};
         backdrop-filter: blur(20px);
         border-radius: 1.25rem;
-        padding: 1.5rem;
+        padding: 0.5rem 1.5rem 1.5rem 1.5rem;
         border: 1px solid {theme["container_border"]};
         box-shadow: {theme["container_shadow"]};
+    }}
+
+    /* Additional specific selector for main chat area padding */
+    .stMainBlockContainer,
+    [data-testid="stMainBlockContainer"],
+    .block-container.st-emotion-cache-liupih,
+    div[class*="stMainBlockContainer"] {{
+        padding-top: 2.0rem !important;
     }}
     .stChatMessage {{
         padding: 1.5rem;
@@ -460,27 +468,36 @@ def apply_custom_styles():
 
     /* Chat input container styling */
     [data-testid="stChatInputContainer"] {{
-        background: {theme["input_background"]} !important;
-        border: 1px solid {theme["input_border"]} !important;
+        background: transparent !important;
+        border: none !important;
         border-radius: 0.75rem !important;
+        padding: 0 !important;
+    }}
+
+    /* Chat input wrapper */
+    [data-testid="stChatInput"] {{
+        background: transparent !important;
+        padding: 0 !important;
     }}
 
     /* Chat input textarea */
     [data-testid="stChatInput"] textarea {{
         background: {theme["input_background"]} !important;
         color: {theme["text_color"]} !important;
-        border: none !important;
+        border: 1px solid {theme["input_border"]} !important;
+        border-radius: 0.75rem !important;
+        padding-left: 1rem !important;
     }}
 
     [data-testid="stChatInput"] textarea:focus {{
         background: {theme["input_focus_background"]} !important;
-        border: none !important;
+        border-color: {theme["input_focus_border"]} !important;
         outline: none !important;
         box-shadow: {theme["input_focus_shadow"]} !important;
     }}
 
     [data-testid="stChatInput"] textarea::placeholder {{
-        color: {theme["muted_text"]} !important;
+        color: {theme["placeholder_text"]} !important;
     }}
 
     /* Chat input submit button */
@@ -498,6 +515,17 @@ def apply_custom_styles():
     /* Bottom container for chat input */
     .stBottom {{
         background: {theme["app_background"]} !important;
+    }}
+
+    /* Remove default chat input margins */
+    [data-testid="stChatInput"] > div {{
+        padding: 0 !important;
+        margin: 0 !important;
+    }}
+
+    [data-testid="stChatInputContainer"] > div {{
+        padding: 0 !important;
+        margin: 0 !important;
     }}
 
     /* Divider color */
