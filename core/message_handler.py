@@ -135,17 +135,20 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
     # Chat input
     if prompt := st.chat_input("Ask a question about your data..."):
-        # Add user message to chat history
+        # Add user message immediately to trigger UI transition
         st.session_state.messages.append({"role": "user", "content": prompt})
-
-        # Update session history immediately after user message
         update_current_session_messages()
 
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        # Store prompt for processing in next cycle
+        st.session_state.pending_prompt = prompt
+        st.rerun()
 
-        # Process query based on selected AI mode
+    # Process pending prompt if exists (after rerun with messages already added)
+    if "pending_prompt" in st.session_state and st.session_state.pending_prompt:
+        prompt = st.session_state.pending_prompt
+        st.session_state.pending_prompt = None  # Clear the pending prompt
+
+        # Process query based on selected AI mode (user message already in messages list)
         with st.chat_message("assistant"):
             if ai_mode == "Genie API" and genie_space_id:
                 # Simplified flow: Direct REGION_GENIE query → Map detection → LLM analysis
@@ -315,7 +318,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                         # LLM Analysis (mandatory for all responses with data)
                         if data_for_llm:
-                            st.markdown("### 💡 LLM Analysis")
+                            #st.markdown("### 💡 LLM Analysis")
 
                             # Stream LLM analysis
                             insight_container = st.empty()
