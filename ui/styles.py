@@ -75,6 +75,7 @@ def apply_custom_styles():
     .main-header {{
         font-size: 2.25rem;
         font-weight: 700;
+        margin-top: 0.5rem;
         margin-bottom: 1.5rem;
         color: {theme["header_color"]};
         letter-spacing: -0.01em;
