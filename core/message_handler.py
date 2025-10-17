@@ -317,16 +317,16 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                     # LLM Analysis (mandatory for all responses with data)
                     if data_for_llm:
-                        #st.markdown("### 💡 LLM Analysis")
+                        # Show spinner only during LLM analysis
+                        with st.spinner("Analyzing data..."):
+                            # Stream LLM analysis
+                            insight_container = st.empty()
 
-                        # Stream LLM analysis
-                        insight_container = st.empty()
+                            # Get LLM endpoint
+                            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
-                        # Get LLM endpoint
-                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
-
-                        # Stream and get final result
-                        llm_result = analyze_data_with_llm(w, prompt, data_for_llm, llm_endpoint, stream_container=insight_container)
+                            # Stream and get final result
+                            llm_result = analyze_data_with_llm(w, prompt, data_for_llm, llm_endpoint, stream_container=insight_container)
 
                         if llm_result["success"]:
                             insight_text = llm_result["content"]
