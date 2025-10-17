@@ -5,6 +5,10 @@ from datetime import datetime
 
 def init_session_state(ai_mode: str):
     """Initialize session state for messages and conversation."""
+    # Initialize theme (default to light mode)
+    if "theme" not in st.session_state:
+        st.session_state.theme = "light"
+
     # Initialize chat sessions list (stores all chat histories)
     if "chat_sessions" not in st.session_state:
         st.session_state.chat_sessions = []

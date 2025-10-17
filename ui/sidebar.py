@@ -17,6 +17,19 @@ def render_sidebar():
 
         st.markdown('<div class="sidebar-spacing"></div>', unsafe_allow_html=True)
 
+        # Theme Switcher
+        current_theme = st.session_state.get("theme", "light")
+        theme_icon = "🌙" if current_theme == "light" else "☀️"
+        theme_label = f"{theme_icon} {'Dark' if current_theme == 'light' else 'Light'} Mode"
+
+        if st.button(theme_label, use_container_width=True, key="theme_toggle_btn"):
+            # Toggle theme
+            new_theme = "dark" if current_theme == "light" else "light"
+            st.session_state.theme = new_theme
+            st.rerun()
+
+        st.markdown('<div class="sidebar-spacing"></div>', unsafe_allow_html=True)
+
         # New Chat Button
         if st.button("✨ New Chat", use_container_width=True, key="new_chat_btn"):
             config = get_config()

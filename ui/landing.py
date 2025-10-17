@@ -1,89 +1,93 @@
 import streamlit as st
+from ui.theme_config import get_theme
 
 
 def display_landing_page():
     """Display a formal and sophisticated landing page when no messages exist."""
+    # Get current theme
+    current_theme = st.session_state.get("theme", "light")
+    theme = get_theme(current_theme)
 
-    # Apply custom CSS for landing page
-    st.markdown("""
+    # Apply custom CSS for landing page with dynamic theme
+    st.markdown(f"""
     <style>
-    /* Landing page specific styles */
-    .landing-hero {
+    /* Landing page specific styles with dynamic theme */
+    .landing-hero {{
         text-align: center;
         padding: 1.5rem 1rem 1rem 1rem;
-    }
+    }}
 
-    .landing-logo {
-        font-size: 2.25rem; 
-    }
+    .landing-logo {{
+        font-size: 2.25rem;
+    }}
 
-    .landing-title {
+    .landing-title {{
         font-size: 2.2rem;
         font-weight: 800;
-        color: #f3f4f6;
+        color: {theme["header_color"]};
         margin: 0 0 0.5rem 0;
         letter-spacing: -0.02em;
-    }
+    }}
 
-    .landing-subtitle {
+    .landing-subtitle {{
         font-size: 1rem;
-        color: #9ca3af;
+        color: {theme["secondary_text"]};
         margin: 0 auto 1rem auto;
         max-width: 700px;
         line-height: 1.5;
-    }
+    }}
 
-    .feature-card {
-        background: rgba(32, 35, 42, 0.6);
-        border: 1px solid rgba(64, 68, 78, 0.3);
+    .feature-card {{
+        background: {theme["message_background"]};
+        border: 1px solid {theme["message_border"]};
         border-radius: 0.875rem;
         padding: 1.25rem;
         height: 100%;
         transition: all 0.3s ease;
         backdrop-filter: blur(12px);
         margin-bottom: 1rem;
-    }
+    }}
 
-    .feature-card:hover {
-        background: rgba(59, 130, 246, 0.08);
-        border-color: rgba(91, 143, 212, 0.4);
+    .feature-card:hover {{
+        background: {theme["preview_hover_background"]};
+        border-color: {theme["message_hover_border"]};
         transform: translateY(-4px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    }
+        box-shadow: {theme["preview_hover_shadow"]};
+    }}
 
-    .feature-icon {
+    .feature-icon {{
         font-size: 2rem;
         margin-bottom: 0.5rem;
         display: block;
-    }
+    }}
 
-    .feature-title {
+    .feature-title {{
         font-size: 1.1rem;
         font-weight: 700;
-        color: #e5e7eb;
+        color: {theme["header_color"]};
         margin-bottom: 0.5rem;
-    }
+    }}
 
-    .feature-description {
+    .feature-description {{
         font-size: 0.875rem;
-        color: #9ca3af;
+        color: {theme["secondary_text"]};
         line-height: 1.5;
-    }
+    }}
 
-    .cta-section {
+    .cta-section {{
         text-align: center;
         padding: 1rem 1rem 0.5rem 1rem;
-    }
+    }}
 
-    .cta-text {
+    .cta-text {{
         font-size: 0.95rem;
-        color: #6b7280;
-    }
+        color: {theme["muted_text"]};
+    }}
 
-    .highlight {
-        color: #60a5fa;
+    .highlight {{
+        color: {theme["user_message_border"]};
         font-weight: 600;
-    }
+    }}
     </style>
     """, unsafe_allow_html=True)
 
