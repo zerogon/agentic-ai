@@ -726,16 +726,16 @@ class DataHelper:
     def create_folium_map(
         df: pd.DataFrame,
         map_type: str = "auto"
-    ) -> Optional[folium.Map]:
+    ):
         """
-        Create an interactive Folium map from geographic data.
+        Create an interactive map from geographic data.
 
         Args:
-            df: DataFrame with geographic data (lat/lon columns)
-            map_type: Type of map ('auto', 'point', 'heatmap')
+            df: DataFrame with geographic data (lat/lon or geometry columns)
+            map_type: Type of map ('auto', 'point', 'heatmap', 'polygon')
 
         Returns:
-            Folium Map object or None if mapping not possible
+            Plotly Figure for polygon data, Folium Map for point/heatmap data, or None if mapping not possible
         """
         map_helper = MapHelper()
 
@@ -745,10 +745,10 @@ class DataHelper:
             print(f"❌ Cannot create map: {reason}")
             return None
 
-        # Auto-create map based on data
-        folium_map = map_helper.auto_create_map(df, map_type=map_type)
+        # Auto-create map based on data (returns Plotly Figure or Folium Map)
+        result_map = map_helper.auto_create_map(df, map_type=map_type)
 
-        return folium_map
+        return result_map
 
     @staticmethod
     def summarize_dataframe(df: pd.DataFrame) -> Dict:

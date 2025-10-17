@@ -48,6 +48,10 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             0% {{ background-position: -1000px 0; }}
             100% {{ background-position: 1000px 0; }}
         }}
+        @keyframes spin {{
+            0% {{ transform: translate(-50%, -50%) rotate(0deg); }}
+            100% {{ transform: translate(-50%, -50%) rotate(360deg); }}
+        }}
         @keyframes dots {{
             0%, 20% {{ content: '.'; }}
             40% {{ content: '..'; }}
@@ -87,8 +91,10 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
             Your browser does not support the video tag.
         </video>
-        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 12px; font-size: 18px; font-weight: 600; text-align: center; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite;">
-            <span class="loading-dots">{message if message else ""}</span>
+        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 12px; font-size: 18px; font-weight: 600; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite; line-height: 1.2;">
+            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; position: relative; top: 4px;">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round" />
+            </svg><span class="loading-dots" style="display: inline-block; vertical-align: middle;">{message if message else ""}</span>
         </div>
     </div>
     """
@@ -136,6 +142,10 @@ def update_loading_message(container, video_id: str, message_id: str, new_messag
             0% {{ background-position: -1000px 0; }}
             100% {{ background-position: 1000px 0; }}
         }}
+        @keyframes spin {{
+            0% {{ transform: translate(-50%, -50%) rotate(0deg); }}
+            100% {{ transform: translate(-50%, -50%) rotate(360deg); }}
+        }}
         @keyframes dots {{
             0%, 20% {{ content: '.'; }}
             40% {{ content: '..'; }}
@@ -175,8 +185,10 @@ def update_loading_message(container, video_id: str, message_id: str, new_messag
             <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
             Your browser does not support the video tag.
         </video>
-        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 20px 30px; border-radius: 12px; font-size: 18px; font-weight: 600; text-align: center; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite;">
-            <span class="loading-dots">{new_message if new_message else ""}</span>
+        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 20px 30px; border-radius: 12px; font-size: 18px; font-weight: 600; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite; line-height: 1.2;">
+            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; position: relative; top: 2px;">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round" />
+            </svg><span class="loading-dots" style="display: inline-block; vertical-align: middle;">{new_message if new_message else ""}</span>
         </div>
     </div>
     """

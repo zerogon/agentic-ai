@@ -6,6 +6,7 @@ Provides utilities for working with geospatial data and creating interactive map
 
 import pandas as pd
 import folium
+import plotly.express as px
 from typing import Optional, Dict, Any, List, Tuple, Union
 import json
 from shapely import wkt
@@ -69,7 +70,6 @@ class MapHelper:
 
                 if geometry_data.upper().startswith(('POLYGON', 'MULTIPOLYGON', 'POINT', 'LINESTRING')):
                     geom = wkt.loads(geometry_data)
-                    print(f"  ✅ Parsed WKT geometry: {geom.geom_type}")
                     return geom
 
                 # Try to parse as JSON string
@@ -481,36 +481,28 @@ class MapHelper:
         name_col: Optional[str] = None,
         value_col: Optional[str] = None,
         popup_cols: Optional[List[str]] = None,
-        color_scheme: str = 'YlOrRd',
-        zoom_start: int = 8,
+        color_scheme: str = 'Blues',
+        zoom_start: int = 10,
         show_context_boundary: Union[bool, str] = "auto",
         context_boundary_geojson: Optional[dict] = None
-    ) -> folium.Map:
+    ):
         """
-        Create an interactive polygon map from geometry data (choropleth style).
+        Create an interactive polygon map from geometry data using Plotly choropleth_mapbox.
 
         Args:
             df: DataFrame with geometry data
             geometry_col: Name of geometry column (WKT or GeoJSON format)
             name_col: Column with region/polygon names
             value_col: Column with numeric values for color coding
-            popup_cols: List of column names to display in popups
-            color_scheme: Folium color scheme (YlOrRd, YlGnBu, Blues, etc.)
+            popup_cols: List of column names to display in popups (used for hover_data)
+            color_scheme: Plotly color scheme (Blues, Reds, Greens, etc.)
             zoom_start: Initial zoom level
-            show_context_boundary: Show context boundary layer
-                - "auto": Auto-detect (e.g., Seoul data shows Seoul boundary)
-                - True: Always show (requires context_boundary_geojson)
-                - False: Never show
-            context_boundary_geojson: GeoJSON for context boundary (optional)
+            show_context_boundary: Not used in Plotly implementation
+            context_boundary_geojson: Not used in Plotly implementation
 
         Returns:
-            Folium Map object
+            Plotly Figure object
         """
-        print(f"\n🗺️  Creating polygon map...")
-        print(f"  - Geometry column: {geometry_col}")
-        print(f"  - Name column: {name_col}")
-        print(f"  - Value column: {value_col}")
-
         # Create a copy to avoid modifying original data
         df_map = df.copy()
 
@@ -539,24 +531,9 @@ class MapHelper:
 
         print(f"  ✅ Created GeoDataFrame with {len(gdf)} polygons")
 
-        # Calculate bounds for map centering
-        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
-        center_lat = (bounds[1] + bounds[3]) / 2
-        center_lon = (bounds[0] + bounds[2]) / 2
-
-        print(f"  🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
-
-        # Create base map
-        m = folium.Map(
-            location=[center_lat, center_lon],
-            zoom_start=zoom_start,
-            tiles='OpenStreetMap'
-        )
-
-        # Auto-detect name column if not specified (need this before Seoul detection)
+        # Auto-detect name column if not specified
         if not name_col:
-            # Look for common name columns
-            name_candidates = ['name', 'region', 'area', 'district', 'location', '지역', '이름', '명']
+            name_candidates = ['name', 'region', 'area', 'district', 'location', '지역', '이름', '명', '행정구역']
             for col in df_map.columns:
                 if col.lower() in name_candidates or any(cand in col.lower() for cand in name_candidates):
                     name_col = col
@@ -565,175 +542,64 @@ class MapHelper:
 
         # Auto-detect value column if not specified
         if not value_col:
-            # Use first numeric column (excluding geometry)
             numeric_cols = df_map.select_dtypes(include=['number']).columns.tolist()
             if len(numeric_cols) > 0:
                 value_col = numeric_cols[0]
                 print(f"  📊 Auto-detected value column: '{value_col}'")
 
-        # Create GeoJSON for Folium
-        geojson_data = json.loads(gdf.to_json())
+        # Calculate center using projected coordinates (EPSG:5179 for Korea)
+        projected = gdf.to_crs(epsg=5179)
+        center_lat = projected.geometry.centroid.to_crs(epsg=4326).y.mean()
+        center_lon = projected.geometry.centroid.to_crs(epsg=4326).x.mean()
 
-        # Auto-detect Seoul data and prepare context boundary BEFORE adding region polygons
-        is_seoul_data = False
-        if show_context_boundary == "auto":
-            # Auto-detect if this is Seoul data
-            if name_col and name_col in df_map.columns:
-                is_seoul_data = detect_seoul_data(df_map, name_col)
-                if is_seoul_data:
-                    print(f"  🏙️  Detected Seoul district data - adding context boundary")
-                    seoul_feature = get_seoul_boundary(simplified=False)
-                    # Wrap Feature in FeatureCollection for Folium
-                    context_boundary_geojson = {
-                        "type": "FeatureCollection",
-                        "features": [seoul_feature]
-                    }
-                    show_context_boundary = True
-                else:
-                    show_context_boundary = False
+        print(f"  🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
 
-        # Add context boundary layer FIRST (background)
-        if show_context_boundary and context_boundary_geojson:
-            print(f"  🗺️  Adding context boundary layer (background)")
-            folium.GeoJson(
-                context_boundary_geojson,
-                style_function=lambda x: {
-                    'fillColor': '#e0e0e0',      # Light gray
-                    'color': '#999999',           # Gray border
-                    'weight': 2,
-                    'fillOpacity': 0.15,          # Very transparent
-                    'dashArray': '5, 5'           # Dashed line
-                },
-                name='context_boundary'
-            ).add_to(m)
+        # Prepare hover data columns
+        hover_data_dict = {}
+        if popup_cols:
+            for col in popup_cols:
+                if col in df_map.columns and col not in [geometry_col]:
+                    hover_data_dict[col] = True
 
-        # Add polygons with distinct colors for each region (foreground - AFTER background)
-        # Use distinct colors from CATEGORY_COLORS for visual differentiation
-        category_colors = self.CATEGORY_COLORS  # Store reference to avoid self issues
-
-        def get_region_style(feature):
-            """Assign distinct color to each region based on index"""
-            feature_id = int(feature.get('id', 0))
-            color_index = feature_id % len(category_colors)
-            color = category_colors[color_index]
-            return {
-                'fillColor': color,
-                'color': 'white',  # Border color
-                'weight': 2,  # Border width
-                'fillOpacity': 0.7
-            }
-
-        def get_highlight_style(feature):
-            """Highlight style on hover"""
-            return {
-                'fillOpacity': 0.9,
-                'weight': 3,
-                'color': '#333333'
-            }
-
-        # Add GeoJson layer with distinct colors (foreground)
-        folium.GeoJson(
-            geojson_data,
-            style_function=get_region_style,
-            highlight_function=get_highlight_style,
-            name='regions'
-        ).add_to(m)
-
-        print(f"  🎨 Created polygon map with {len(gdf)} distinct colored regions")
-
-        # Add color legend if name_col exists
+        # Add name and value columns to hover data if they exist
         if name_col and name_col in df_map.columns:
-            legend_html = '''
-            <div style="position: fixed;
-                        top: 10px; right: 10px;
-                        background-color: white;
-                        border: 2px solid grey;
-                        border-radius: 5px;
-                        z-index: 9999;
-                        font-size: 13px;
-                        padding: 12px;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                        max-height: 400px;
-                        overflow-y: auto;">
-                <p style="margin: 0 0 10px 0; font-weight: bold; border-bottom: 2px solid #ddd; padding-bottom: 5px;">
-                    🗺️ Regions
-                </p>
-            '''
+            hover_data_dict[name_col] = True
+        if value_col and value_col in df_map.columns:
+            hover_data_dict[value_col] = True
 
-            # Add each region with its color
-            for idx, row in df_map.iterrows():
-                region_name = row[name_col]
-                color_index = idx % len(category_colors)
-                color = category_colors[color_index]
+        # Create choropleth_mapbox figure
+        fig = px.choropleth_mapbox(
+            gdf,
+            geojson=gdf.set_geometry('geometry').__geo_interface__,
+            locations=gdf.index,
+            color=value_col if value_col else None,
+            color_continuous_scale=color_scheme,
+            mapbox_style="carto-positron",
+            center={"lat": center_lat, "lon": center_lon},
+            zoom=zoom_start,
+            opacity=0.7,
+            hover_name=name_col if name_col else None,
+            hover_data=hover_data_dict if hover_data_dict else None
+        )
 
-                # Add value if available
-                value_text = ""
-                if value_col and value_col in row:
-                    try:
-                        value = float(row[value_col])
-                        value_text = f"<span style='font-size: 11px; color: #666;'>({value:,.0f})</span>"
-                    except:
-                        pass
-
-                legend_html += f'''
-                <p style="margin: 5px 0; display: flex; align-items: center;">
-                    <span style="display: inline-block; width: 18px; height: 18px;
-                                 background-color: {color}; border-radius: 3px;
-                                 margin-right: 8px; border: 1px solid #999;"></span>
-                    <span style="flex: 1; font-size: 12px;">{region_name} {value_text}</span>
-                </p>
-                '''
-
-            legend_html += '</div>'
-
-            # Add legend to map
-            m.get_root().html.add_child(folium.Element(legend_html))
-            print(f"  🏷️  Added legend with {len(df_map)} region labels")
-
-        # Add interactive tooltips/popups
-        for idx, row in df_map.iterrows():
-            # Build popup content
-            popup_html = "<div style='font-family: Arial; font-size: 12px; min-width: 200px;'>"
-
-            # Add name if available
-            if name_col and name_col in row:
-                popup_html += f"<h4 style='margin: 0 0 10px 0; color: #2c3e50;'>{row[name_col]}</h4>"
-
-            # Add value if available
-            if value_col and value_col in row:
-                popup_html += f"<p style='margin: 5px 0;'><b>{value_col}:</b> {row[value_col]:,.2f}</p>"
-
-            # Add other popup columns
-            if popup_cols:
-                for col in popup_cols:
-                    if col in row and col not in [geometry_col, name_col, value_col]:
-                        popup_html += f"<p style='margin: 3px 0;'><b>{col}:</b> {row[col]}</p>"
-
-            popup_html += "</div>"
-
-            # Get polygon centroid for popup placement
-            geom = geometries[idx]
-            centroid = geom.centroid
-
-            # Add invisible marker at centroid for popup (workaround for polygon popup limitations)
-            folium.Marker(
-                location=[centroid.y, centroid.x],
-                popup=folium.Popup(popup_html, max_width=300),
-                icon=folium.Icon(icon='info-sign', prefix='glyphicon', color='blue'),
-                opacity=0.7
-            ).add_to(m)
-
-        # Fit map bounds to show all polygons with generous padding
-        # Format: [[south, west], [north, east]]
-        m.fit_bounds(
-            [[bounds[1], bounds[0]], [bounds[3], bounds[2]]],
-            padding=[50, 50]  # Increased padding for better initial view
+        # Update layout to prevent clipping and ensure full width
+        fig.update_layout(
+            margin={"r":0,"t":0,"l":0,"b":0},
+            autosize=True,
+            height=600,
+            width=None,  # Let Streamlit control the width
+            mapbox=dict(
+                center={"lat": center_lat, "lon": center_lon},
+                zoom=zoom_start
+            ),
+            # Remove any padding that might cause clipping
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
 
         print(f"  ✅ Polygon map created successfully with {len(gdf)} regions")
-        print(f"  🗺️  Map bounds: SW({bounds[1]:.4f}, {bounds[0]:.4f}) to NE({bounds[3]:.4f}, {bounds[2]:.4f})")
 
-        return m
+        return fig
 
     def create_heatmap(
         self,
@@ -875,7 +741,7 @@ class MapHelper:
         self,
         df: pd.DataFrame,
         map_type: str = "auto"
-    ) -> Optional[folium.Map]:
+    ):
         """
         Automatically create the most appropriate map based on data.
 
@@ -884,7 +750,7 @@ class MapHelper:
             map_type: Type of map ('auto', 'point', 'heatmap', 'polygon')
 
         Returns:
-            Folium Map object or None if mapping not possible
+            Plotly Figure for polygon data, Folium Map for point/heatmap data, or None if mapping not possible
         """
         can_map, reason = self.can_create_map(df)
         if not can_map:
@@ -902,7 +768,7 @@ class MapHelper:
 
                 # Auto-detect name column
                 name_col = None
-                name_candidates = ['name', 'region', 'area', 'district', 'location', '지역', '이름', '명']
+                name_candidates = ['name', 'region', 'area', 'district', 'location', '지역', '이름', '명', '행정구역']
                 for col in df.columns:
                     if col != geometry_col and (col.lower() in name_candidates or any(cand in col.lower() for cand in name_candidates)):
                         name_col = col
@@ -917,7 +783,7 @@ class MapHelper:
                 # Determine popup columns (exclude geometry, name, value)
                 popup_cols = [col for col in df.columns if col not in [geometry_col, name_col, value_col]][:5]
 
-                # Create polygon map
+                # Create polygon map (returns Plotly Figure)
                 return self.create_polygon_map(
                     df,
                     geometry_col=geometry_col,
@@ -946,7 +812,7 @@ class MapHelper:
             if map_type == "heatmap":
                 return self.create_heatmap(df, lat_col, lon_col)
             else:
-                # Default to point map with category colors
+                # Default to point map with category colors (returns Folium Map)
                 return self.create_point_map(
                     df, lat_col, lon_col,
                     popup_cols=popup_cols,

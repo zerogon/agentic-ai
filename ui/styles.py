@@ -220,11 +220,33 @@ def apply_custom_styles():
     /* Button text container */
     [data-testid="stSidebar"] button > div {{
         padding: 0 !important;
+        width: 100% !important;
+        overflow: hidden !important;
     }}
     [data-testid="stSidebar"] button p {{
         margin: 0 !important;
         padding: 0 !important;
         line-height: 1.2 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        width: 100% !important;
+    }}
+    /* Recent chats secondary buttons - specific text overflow handling */
+    [data-testid="stSidebar"] .stBaseButton-secondary button {{
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }}
+    [data-testid="stSidebar"] .stBaseButton-secondary button > div {{
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }}
+    [data-testid="stSidebar"] .stBaseButton-secondary button p {{
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
     }}
     /* Message preview styling with dynamic theme */
     .message-preview {{

@@ -157,7 +157,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 loading_container, video_id, message_id = display_loading_video(
                     width=600,
                     loop=True,
-                    message="🔍 Processing query"
+                    message="Processing query"
                 )
 
                 # Get REGION_GENIE Space ID
@@ -166,148 +166,140 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 # Execute REGION_GENIE query
                 genie = GenieHelper(w, region_space_id)
 
-                # Create status container for progress
-                status_container = st.status("Processing query...", expanded=False)
+                # No status container - loading video handles all visual feedback
+                # Progress tracking disabled to avoid showing "Processing query..."
+                # Get conversation ID for REGION_GENIE
+                conv_id = st.session_state.conversation_ids.get("REGION_GENIE")
 
-                # Progress callback
-                progress_placeholder = st.empty()
-                def update_progress(icon: str, message: str):
-                    progress_placeholder.markdown(f"{icon} {message}")
+                if conv_id:
+                    # Continue conversation
+                    result = genie.continue_conversation(conv_id, prompt)
+                else:
+                    # Start new conversation
+                    result = genie.start_conversation(prompt)
 
-                genie.set_progress_callback(update_progress)
+                if result["success"]:
+                    # Update loading message
+                    update_loading_message(
+                        loading_container,
+                        video_id,
+                        message_id,
+                        "✅ Complete"
+                    )
+                    time.sleep(0.3)
 
-                with status_container:
-                    # Get conversation ID for REGION_GENIE
-                    conv_id = st.session_state.conversation_ids.get("REGION_GENIE")
+                    # Remove loading video
+                    remove_loading_video(loading_container, video_id)
 
-                    if conv_id:
-                        # Continue conversation
-                        result = genie.continue_conversation(conv_id, prompt)
-                    else:
-                        # Start new conversation
-                        result = genie.start_conversation(prompt)
+                    # Store conversation ID
+                    st.session_state.conversation_id = result["conversation_id"]
+                    st.session_state.conversation_ids["REGION_GENIE"] = result["conversation_id"]
 
-                    if result["success"]:
-                        # Update loading message
-                        update_loading_message(
-                            loading_container,
-                            video_id,
-                            message_id,
-                            "✅ Complete"
-                        )
-                        time.sleep(0.3)
+                    # Process response
+                    messages = genie.process_response(result["response"])
 
-                        # Remove loading video
-                        remove_loading_video(loading_container, video_id)
+                    # Process each message from Genie
+                    data_for_llm = []
 
-                        # Store conversation ID
-                        st.session_state.conversation_id = result["conversation_id"]
-                        st.session_state.conversation_ids["REGION_GENIE"] = result["conversation_id"]
+                    for msg in messages:
+                        # Skip displaying content from Genie - only show SQL/charts/tables
+                        # st.markdown(msg["content"])
 
-                        # Process response
-                        messages = genie.process_response(result["response"])
+                        if msg.get("type") == "query":
+                            # Show SQL code in collapsible expander
+                            if msg.get("code"):
+                                with st.expander("📝 Generated SQL", expanded=False):
+                                    formatted_sql = data_helper.format_sql_code(msg["code"])
+                                    st.code(formatted_sql, language="sql")
 
-                        # Update status to complete
-                        status_container.update(label="Query complete!", state="complete", expanded=True)
+                            # Show data and visualization
+                            if not msg["data"].empty:
+                                # Collect data for LLM analysis
+                                data_for_llm.append({
+                                    "domain": "REGION_GENIE",
+                                    "data": msg["data"],
+                                    "content": msg.get("content", "")
+                                })
 
-                        # Process each message from Genie
-                        data_for_llm = []
+                                # Auto-detect chart type or use map
+                                selected_chart = chart_type.lower()
+                                if selected_chart == "auto":
+                                    selected_chart = "map"  # Default to map for REGION_GENIE
 
-                        for msg in messages:
-                            # Skip displaying content from Genie - only show SQL/charts/tables
-                            # st.markdown(msg["content"])
+                                # Create map or Plotly chart
+                                folium_map = None
+                                plotly_fig = None
 
-                            if msg.get("type") == "query":
-                                # Show SQL code in collapsible expander
-                                if msg.get("code"):
-                                    with st.expander("📝 Generated SQL", expanded=False):
-                                        formatted_sql = data_helper.format_sql_code(msg["code"])
-                                        st.code(formatted_sql, language="sql")
+                                if selected_chart == "map":
+                                    # Try to create map (returns Plotly Figure for polygon data, Folium Map for point data)
+                                    map_result = data_helper.create_folium_map(msg["data"])
 
-                                # Show data and visualization
-                                if not msg["data"].empty:
-                                    # Collect data for LLM analysis
-                                    data_for_llm.append({
-                                        "domain": "REGION_GENIE",
-                                        "data": msg["data"],
-                                        "content": msg.get("content", "")
-                                    })
-
-                                    # Auto-detect chart type or use map
-                                    selected_chart = chart_type.lower()
-                                    if selected_chart == "auto":
-                                        selected_chart = "map"  # Default to map for REGION_GENIE
-
-                                    # Create Folium map or Plotly chart
-                                    folium_map = None
-                                    plotly_fig = None
-
-                                    if selected_chart == "map":
-                                        # Try to create Folium map (handles geometry auto-detection)
-                                        folium_map = data_helper.create_folium_map(msg["data"])
-
-                                        if folium_map:
-                                            # Display Folium map
+                                    if map_result:
+                                        # Check if it's a Plotly Figure (polygon map) or Folium Map (point map)
+                                        if hasattr(map_result, 'to_html'):
+                                            # It's a Plotly Figure
+                                            plotly_fig = map_result
+                                            st.plotly_chart(
+                                                plotly_fig,
+                                                use_container_width=True,
+                                                config={'responsive': True, 'displayModeBar': False}
+                                            )
+                                        elif hasattr(map_result, '_repr_html_'):
+                                            # It's a Folium Map
+                                            folium_map = map_result
                                             st.components.v1.html(
                                                 folium_map._repr_html_(),
                                                 height=600,
                                                 scrolling=True
                                             )
-                                        else:
-                                            # Fallback to Plotly map or other chart
-                                            plotly_fig = data_helper.create_chart(
-                                                msg["data"],
-                                                "bar",  # Fallback to bar chart if map fails
-                                                title="Query Results",
-                                                dark_mode=True
-                                            )
-                                            if plotly_fig:
-                                                st.plotly_chart(plotly_fig, use_container_width=True)
                                     else:
-                                        # Create Plotly chart for non-map visualizations
+                                        # Fallback to bar chart if map fails
                                         plotly_fig = data_helper.create_chart(
                                             msg["data"],
-                                            selected_chart,
+                                            "bar",
                                             title="Query Results",
                                             dark_mode=True
                                         )
-
                                         if plotly_fig:
                                             st.plotly_chart(plotly_fig, use_container_width=True)
-
-                                    # Show data table (skip for maps with geometry)
-                                    is_map_chart = selected_chart == "map" and folium_map is not None
-
-                                    if not is_map_chart:
-                                        st.markdown("**📋 Data:**")
-                                        st.dataframe(msg["data"], use_container_width=True)
-
-                                    # Add to chat history (without content text)
-                                    message_data = {
-                                        "role": "assistant",
-                                        "content": "",  # Hide content, only show SQL/charts/tables
-                                        "code": msg.get("code"),
-                                        "table_data": msg["data"],
-                                        "domain": "REGION_GENIE"
-                                    }
-
-                                    # Store map or chart as HTML
-                                    if folium_map:
-                                        message_data["folium_map"] = folium_map._repr_html_()
-                                    elif plotly_fig:
-                                        message_data["chart_data"] = plotly_fig.to_html(
-                                            include_plotlyjs='cdn',
-                                            div_id=f'plotly-chart-{len(st.session_state.messages)}'
-                                        )
-
-                                    st.session_state.messages.append(message_data)
                                 else:
-                                    # Text-only response
-                                    st.session_state.messages.append({
-                                        "role": "assistant",
-                                        "content": msg["content"],
-                                        "domain": "REGION_GENIE"
-                                    })
+                                    # Create Plotly chart for non-map visualizations
+                                    plotly_fig = data_helper.create_chart(
+                                        msg["data"],
+                                        selected_chart,
+                                        title="Query Results",
+                                        dark_mode=True
+                                    )
+
+                                    if plotly_fig:
+                                        st.plotly_chart(plotly_fig, use_container_width=True)
+
+                                # Show data table (skip for maps - both Folium and Plotly)
+                                is_map_chart = selected_chart == "map" and (folium_map is not None or plotly_fig is not None)
+
+                                if not is_map_chart:
+                                    st.markdown("**📋 Data:**")
+                                    st.dataframe(msg["data"], use_container_width=True)
+
+                                # Add to chat history (without content text)
+                                message_data = {
+                                    "role": "assistant",
+                                    "content": "",  # Hide content, only show SQL/charts/tables
+                                    "code": msg.get("code"),
+                                    "table_data": msg["data"],
+                                    "domain": "REGION_GENIE"
+                                }
+
+                                # Store map or chart as HTML
+                                if folium_map:
+                                    message_data["folium_map"] = folium_map._repr_html_()
+                                elif plotly_fig:
+                                    message_data["chart_data"] = plotly_fig.to_html(
+                                        include_plotlyjs='cdn',
+                                        div_id=f'plotly-chart-{len(st.session_state.messages)}'
+                                    )
+
+                                st.session_state.messages.append(message_data)
                             else:
                                 # Text-only response
                                 st.session_state.messages.append({
@@ -315,48 +307,55 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     "content": msg["content"],
                                     "domain": "REGION_GENIE"
                                 })
+                        else:
+                            # Text-only response
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": msg["content"],
+                                "domain": "REGION_GENIE"
+                            })
 
-                        # LLM Analysis (mandatory for all responses with data)
-                        if data_for_llm:
-                            #st.markdown("### 💡 LLM Analysis")
+                    # LLM Analysis (mandatory for all responses with data)
+                    if data_for_llm:
+                        #st.markdown("### 💡 LLM Analysis")
 
-                            # Stream LLM analysis
-                            insight_container = st.empty()
+                        # Stream LLM analysis
+                        insight_container = st.empty()
 
-                            # Get LLM endpoint
-                            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
+                        # Get LLM endpoint
+                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
-                            # Stream and get final result
-                            llm_result = analyze_data_with_llm(w, prompt, data_for_llm, llm_endpoint, stream_container=insight_container)
+                        # Stream and get final result
+                        llm_result = analyze_data_with_llm(w, prompt, data_for_llm, llm_endpoint, stream_container=insight_container)
 
-                            if llm_result["success"]:
-                                insight_text = llm_result["content"]
-                                # Add LLM insight to chat history
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": f"💡 **LLM Analysis**\n\n{insight_text}"
-                                })
-                            else:
-                                error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
-                                st.error(error_msg)
-                                st.session_state.messages.append({
-                                    "role": "assistant",
-                                    "content": error_msg
-                                })
+                        if llm_result["success"]:
+                            insight_text = llm_result["content"]
+                            # Add LLM insight to chat history
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": f"💡 **LLM Analysis**\n\n{insight_text}"
+                            })
+                        else:
+                            error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
+                            st.error(error_msg)
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": error_msg
+                            })
 
-                        # Update session after all messages processed
-                        update_current_session_messages()
-                    else:
-                        # Remove loading video on error
-                        remove_loading_video(loading_container, video_id)
+                    # Update session after all messages processed
+                    update_current_session_messages()
+                else:
+                    # Remove loading video on error
+                    remove_loading_video(loading_container, video_id)
 
-                        error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
-                        st.error(error_msg)
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": error_msg
-                        })
-                        update_current_session_messages()
+                    error_msg = f"❌ Error: {result.get('error', 'Unknown error')}"
+                    st.error(error_msg)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": error_msg
+                    })
+                    update_current_session_messages()
 
             else:
                 # Mock mode (demo)
