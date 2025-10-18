@@ -7,7 +7,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import Optional, Dict, Tuple
-import folium
 from utils.map_helper import MapHelper
 
 
@@ -728,14 +727,14 @@ class DataHelper:
         map_type: str = "auto"
     ):
         """
-        Create an interactive map from geographic data.
+        Create an interactive map from geographic data using Plotly.
 
         Args:
             df: DataFrame with geographic data (lat/lon or geometry columns)
-            map_type: Type of map ('auto', 'point', 'heatmap', 'polygon')
+            map_type: Type of map ('auto', 'point', 'polygon')
 
         Returns:
-            Plotly Figure for polygon data, Folium Map for point/heatmap data, or None if mapping not possible
+            Plotly Figure object, or None if mapping not possible
         """
         map_helper = MapHelper()
 
@@ -745,7 +744,7 @@ class DataHelper:
             print(f"❌ Cannot create map: {reason}")
             return None
 
-        # Auto-create map based on data (returns Plotly Figure or Folium Map)
+        # Auto-create map based on data (returns Plotly Figure)
         result_map = map_helper.auto_create_map(df, map_type=map_type)
 
         return result_map

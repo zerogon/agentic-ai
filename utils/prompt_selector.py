@@ -13,7 +13,7 @@ def get_prompt_by_inq(inq_value: str) -> str:
     Get the appropriate prompt name based on inq value.
 
     Args:
-        inq_value: The inq column value (p1, p2, p3, p4)
+        inq_value: The inq column value (p1, p2, p3, p4, p5)
 
     Returns:
         Prompt name to use for analysis
@@ -21,6 +21,8 @@ def get_prompt_by_inq(inq_value: str) -> str:
     Example:
         >>> get_prompt_by_inq("p1")
         "p1_analyst"
+        >>> get_prompt_by_inq("p5")
+        "p5_analyst"
         >>> get_prompt_by_inq("unknown")
         "data_analyst"
     """
@@ -32,7 +34,8 @@ def get_prompt_by_inq(inq_value: str) -> str:
         "p1": "p1_analyst",
         "p2": "p2_analyst",
         "p3": "p3_analyst",
-        "p4": "p4_analyst"
+        "p4": "p4_analyst",
+        "p5": "p5_analyst"
     }
 
     # Return mapped prompt or default
@@ -178,8 +181,8 @@ def merge_analysis_results(results: dict) -> dict:
     # Merge successful results
     merged_content_parts = []
 
-    # Sort by inq value for consistent ordering (p1, p2, p3, p4)
-    inq_order = ["p1", "p2", "p3", "p4", "default"]
+    # Sort by inq value for consistent ordering (p1, p2, p3, p4, p5)
+    inq_order = ["p1", "p2", "p3", "p4", "p5", "default"]
     sorted_inq_values = sorted(
         results.keys(),
         key=lambda x: inq_order.index(x) if x in inq_order else 999

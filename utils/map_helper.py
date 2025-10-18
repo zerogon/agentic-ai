@@ -5,7 +5,6 @@ Provides utilities for working with geospatial data and creating interactive map
 """
 
 import pandas as pd
-import folium
 import plotly.express as px
 from typing import Optional, Dict, Any, List, Tuple, Union
 import json
@@ -51,6 +50,52 @@ class MapHelper:
     def __init__(self):
         """Initialize the MapHelper."""
         pass
+
+    @staticmethod
+    def calculate_auto_zoom(lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> int:
+        """
+        Calculate appropriate zoom level based on coordinate bounds.
+
+        Args:
+            lat_min: Minimum latitude
+            lat_max: Maximum latitude
+            lon_min: Minimum longitude
+            lon_max: Maximum longitude
+
+        Returns:
+            Appropriate zoom level (0-20)
+        """
+        # Calculate the span of coordinates
+        lat_span = abs(lat_max - lat_min)
+        lon_span = abs(lon_max - lon_min)
+
+        # Use the larger span to determine zoom
+        max_span = max(lat_span, lon_span)
+
+        # Zoom level mapping based on coordinate span
+        # These values are empirically determined for good fit
+        if max_span >= 10:  # Country/region level
+            return 5
+        elif max_span >= 5:  # Large area
+            return 6
+        elif max_span >= 2:  # Medium area
+            return 7
+        elif max_span >= 1:  # City level
+            return 8
+        elif max_span >= 0.5:  # District level
+            return 9
+        elif max_span >= 0.2:  # Neighborhood level
+            return 10
+        elif max_span >= 0.1:  # Local area
+            return 11
+        elif max_span >= 0.05:  # Small area
+            return 12
+        elif max_span >= 0.02:  # Very small area
+            return 13
+        elif max_span >= 0.01:  # Street level
+            return 14
+        else:  # Building level
+            return 15
 
     @staticmethod
     def parse_geometry(geometry_data: Union[str, dict]) -> Optional[Union[Polygon, MultiPolygon]]:
@@ -273,22 +318,24 @@ class MapHelper:
         popup_cols: Optional[List[str]] = None,
         color_col: Optional[str] = None,
         size_col: Optional[str] = None,
-        zoom_start: int = 10
-    ) -> folium.Map:
+        zoom_start: int = 10,
+        mapbox_style: str = "carto-positron"
+    ):
         """
-        Create an interactive point map from latitude/longitude data.
+        Create an interactive point map from latitude/longitude data using Plotly.
 
         Args:
             df: DataFrame with geographic data
             lat_col: Name of latitude column
             lon_col: Name of longitude column
-            popup_cols: List of column names to display in popups
+            popup_cols: List of column names to display in hover tooltips
             color_col: Column to use for color coding markers
             size_col: Column to use for sizing markers
             zoom_start: Initial zoom level
+            mapbox_style: Plotly mapbox style ('carto-positron', 'open-street-map', 'stamen-terrain', etc.)
 
         Returns:
-            Folium Map object
+            Plotly Figure object
         """
         # Create a copy to avoid modifying original data
         df_map = df.copy()
@@ -326,153 +373,78 @@ class MapHelper:
         lat_min, lat_max = df_map[lat_col].min(), df_map[lat_col].max()
         lon_min, lon_max = df_map[lon_col].min(), df_map[lon_col].max()
 
+        # Calculate auto zoom level based on coordinate bounds
+        auto_zoom = self.calculate_auto_zoom(lat_min, lat_max, lon_min, lon_max)
+
+        # Use auto zoom if zoom_start is default (10), otherwise respect user's choice
+        final_zoom = auto_zoom if zoom_start == 10 else zoom_start
+
         print(f"\n🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
         print(f"📏 Coordinate ranges:")
         print(f"  - Latitude: {lat_min:.6f} to {lat_max:.6f}")
         print(f"  - Longitude: {lon_min:.6f} to {lon_max:.6f}")
+        print(f"🔍 Auto-calculated zoom: {auto_zoom} (using: {final_zoom})")
 
-        # Create base map (zoom_start will be overridden by fit_bounds)
-        m = folium.Map(
-            location=[center_lat, center_lon],
-            zoom_start=zoom_start,
-            tiles='OpenStreetMap'
+        # Prepare hover data columns
+        hover_data_dict = {}
+        if popup_cols:
+            for col in popup_cols:
+                if col in df_map.columns and col not in [lat_col, lon_col]:
+                    hover_data_dict[col] = True
+
+        # Add color and size columns to hover data if they exist
+        if color_col and color_col in df_map.columns:
+            hover_data_dict[color_col] = True
+        if size_col and size_col in df_map.columns:
+            hover_data_dict[size_col] = True
+
+        # Determine if color_col is categorical or numeric
+        is_categorical = False
+        if color_col and color_col in df_map.columns:
+            is_categorical = not pd.api.types.is_numeric_dtype(df_map[color_col])
+
+        # Create scatter_mapbox figure
+        fig = px.scatter_mapbox(
+            df_map,
+            lat=lat_col,
+            lon=lon_col,
+            color=color_col if color_col else None,
+            size=size_col if size_col else None,
+            hover_data=hover_data_dict if hover_data_dict else None,
+            color_discrete_sequence=self.CATEGORY_COLORS if is_categorical else None,
+            color_continuous_scale="Viridis" if not is_categorical and color_col else None,
+            mapbox_style=mapbox_style,
+            zoom=final_zoom,
+            center={"lat": center_lat, "lon": center_lon},
+            opacity=0.7
         )
 
-        # Create category to color mapping if color_col is categorical
-        category_color_map = {}
-        if color_col and color_col in df_map.columns:
-            if not pd.api.types.is_numeric_dtype(df_map[color_col]):
-                unique_categories = df_map[color_col].unique()
-                for idx, category in enumerate(unique_categories):
-                    category_color_map[category] = self.CATEGORY_COLORS[idx % len(self.CATEGORY_COLORS)]
-                print(f"\n🎨 Created color mapping for {len(unique_categories)} categories")
-                for category, color in list(category_color_map.items())[:5]:
-                    print(f"  - {category}: {color}")
-                if len(category_color_map) > 5:
-                    print(f"  ... and {len(category_color_map) - 5} more")
+        # Update layout to prevent clipping and ensure full width
+        fig.update_layout(
+            margin={"r": 0, "t": 0, "l": 0, "b": 0},
+            autosize=True,
+            height=600,
+            width=None,  # Let Streamlit control the width
+            mapbox=dict(
+                center={"lat": center_lat, "lon": center_lon},
+                zoom=final_zoom
+            ),
+            # Remove any padding that might cause clipping
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
 
-        # Add points (use df_map with converted coordinates)
-        marker_count = 0
-        for idx, row in df_map.iterrows():
-            lat = row[lat_col]
-            lon = row[lon_col]
+        # Update marker sizes if size_col is specified
+        if size_col and size_col in df_map.columns:
+            # Scale marker sizes between 5 and 20
+            fig.update_traces(marker=dict(sizemode='diameter', sizemin=5, sizeref=2))
 
-            # Skip invalid coordinates
-            if pd.isna(lat) or pd.isna(lon):
-                continue
+        print(f"  ✅ Point map created successfully with {len(df_map)} markers")
+        print(f"  🗺️  Map style: {mapbox_style}")
+        print(f"  🎨 Color by: {color_col if color_col else 'None'}")
+        print(f"  📏 Size by: {size_col if size_col else 'None'}")
 
-            marker_count += 1
-            if marker_count <= 3:
-                print(f"  🔵 Adding marker {marker_count}: ({lat:.6f}, {lon:.6f})")
-
-            # Build popup content
-            popup_html = ""
-            if popup_cols:
-                popup_html = "<div style='font-family: Arial; font-size: 12px;'>"
-                for col in popup_cols:
-                    if col in row:
-                        popup_html += f"<b>{col}:</b> {row[col]}<br>"
-                popup_html += "</div>"
-
-            # Determine marker color
-            color = 'blue'
-            if color_col and color_col in row:
-                value = row[color_col]
-
-                # Check if categorical (using pre-built color map)
-                if category_color_map and value in category_color_map:
-                    color = category_color_map[value]
-                elif isinstance(value, (int, float)):
-                    # Use value-based coloring for numeric data (use df_map for min/max)
-                    max_val = df_map[color_col].max()
-                    min_val = df_map[color_col].min()
-                    if max_val > min_val:
-                        normalized = (value - min_val) / (max_val - min_val)
-                        if normalized > 0.66:
-                            color = 'red'
-                        elif normalized > 0.33:
-                            color = 'orange'
-                        else:
-                            color = 'green'
-
-            # Determine marker size
-            radius = 8
-            if size_col and size_col in row:
-                value = row[size_col]
-                if isinstance(value, (int, float)):
-                    # Use df_map for min/max
-                    max_val = df_map[size_col].max()
-                    min_val = df_map[size_col].min()
-                    if max_val > min_val:
-                        # Scale between 5 and 20
-                        normalized = (value - min_val) / (max_val - min_val)
-                        radius = 5 + (normalized * 15)
-
-            # Add marker
-            folium.CircleMarker(
-                location=[lat, lon],
-                radius=radius,
-                popup=folium.Popup(popup_html, max_width=300) if popup_html else None,
-                color=color,
-                fill=True,
-                fillColor=color,
-                fillOpacity=0.6
-            ).add_to(m)
-
-        print(f"\n✅ Total markers added: {marker_count}")
-
-        # Add legend if color_col is used
-        if color_col and color_col in df_map.columns:
-            # Get unique categories
-            unique_categories = df_map[color_col].unique()
-
-            # Only add legend for categorical data (not numeric)
-            if not pd.api.types.is_numeric_dtype(df_map[color_col]):
-                # Create legend HTML
-                legend_html = '''
-                <div style="position: fixed;
-                            top: 10px; right: 10px; width: 200px;
-                            background-color: white;
-                            border: 2px solid grey;
-                            border-radius: 5px;
-                            z-index: 9999;
-                            font-size: 14px;
-                            padding: 10px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                    <p style="margin: 0 0 10px 0; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-                        Category Legend
-                    </p>
-                '''
-
-                # Create category to color mapping
-                category_colors = {}
-                for idx, category in enumerate(unique_categories):
-                    color = self.CATEGORY_COLORS[idx % len(self.CATEGORY_COLORS)]
-                    category_colors[category] = color
-                    legend_html += f'''
-                    <p style="margin: 5px 0; display: flex; align-items: center;">
-                        <span style="display: inline-block; width: 20px; height: 20px;
-                                     background-color: {color}; border-radius: 50%;
-                                     margin-right: 8px; border: 1px solid #999;"></span>
-                        <span style="flex: 1;">{category}</span>
-                    </p>
-                    '''
-
-                legend_html += '</div>'
-
-                # Add legend to map
-                m.get_root().html.add_child(folium.Element(legend_html))
-
-                print(f"🎨 Added legend with {len(unique_categories)} categories")
-
-        # Fit map bounds to show all markers with some padding
-        # Create bounds: [[south-west corner], [north-east corner]]
-        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
-        m.fit_bounds(bounds, padding=[30, 30])  # Add 30px padding on all sides
-
-        print(f"🗺️  Map fitted to bounds: SW({lat_min:.6f}, {lon_min:.6f}) to NE({lat_max:.6f}, {lon_max:.6f})")
-
-        return m
+        return fig
 
     def create_polygon_map(
         self,
@@ -552,7 +524,19 @@ class MapHelper:
         center_lat = projected.geometry.centroid.to_crs(epsg=4326).y.mean()
         center_lon = projected.geometry.centroid.to_crs(epsg=4326).x.mean()
 
+        # Calculate bounds for auto zoom
+        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
+        lon_min, lat_min, lon_max, lat_max = bounds
+
+        # Calculate auto zoom level based on geometry bounds
+        auto_zoom = self.calculate_auto_zoom(lat_min, lat_max, lon_min, lon_max)
+
+        # Use auto zoom if zoom_start is default (10), otherwise respect user's choice
+        final_zoom = auto_zoom if zoom_start == 10 else zoom_start
+
         print(f"  🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
+        print(f"  📏 Bounds: lat ({lat_min:.6f}, {lat_max:.6f}), lon ({lon_min:.6f}, {lon_max:.6f})")
+        print(f"  🔍 Auto-calculated zoom: {auto_zoom} (using: {final_zoom})")
 
         # Prepare hover data columns
         hover_data_dict = {}
@@ -576,7 +560,7 @@ class MapHelper:
             color_continuous_scale=color_scheme,
             mapbox_style="carto-positron",
             center={"lat": center_lat, "lon": center_lon},
-            zoom=zoom_start,
+            zoom=final_zoom,
             opacity=0.7,
             hover_name=name_col if name_col else None,
             hover_data=hover_data_dict if hover_data_dict else None
@@ -590,7 +574,7 @@ class MapHelper:
             width=None,  # Let Streamlit control the width
             mapbox=dict(
                 center={"lat": center_lat, "lon": center_lon},
-                zoom=zoom_start
+                zoom=final_zoom
             ),
             # Remove any padding that might cause clipping
             paper_bgcolor='rgba(0,0,0,0)',
@@ -601,141 +585,7 @@ class MapHelper:
 
         return fig
 
-    def create_heatmap(
-        self,
-        df: pd.DataFrame,
-        lat_col: str,
-        lon_col: str,
-        weight_col: Optional[str] = None,
-        zoom_start: int = 10
-    ) -> folium.Map:
-        """
-        Create a heatmap from point data.
 
-        Args:
-            df: DataFrame with geographic data
-            lat_col: Name of latitude column
-            lon_col: Name of longitude column
-            weight_col: Column to use for heatmap intensity
-            zoom_start: Initial zoom level
-
-        Returns:
-            Folium Map object
-        """
-        from folium.plugins import HeatMap
-
-        # Create a copy to avoid modifying original data
-        df_map = df.copy()
-
-        # Convert lat/lon columns to numeric, handling errors
-        df_map[lat_col] = pd.to_numeric(df_map[lat_col], errors='coerce')
-        df_map[lon_col] = pd.to_numeric(df_map[lon_col], errors='coerce')
-
-        # Remove rows with invalid coordinates
-        df_map = df_map.dropna(subset=[lat_col, lon_col])
-
-        if df_map.empty:
-            raise ValueError("No valid coordinates found after conversion")
-
-        # Calculate center and bounds
-        center_lat = df_map[lat_col].mean()
-        center_lon = df_map[lon_col].mean()
-
-        # Get min/max coordinates for bounds
-        lat_min, lat_max = df_map[lat_col].min(), df_map[lat_col].max()
-        lon_min, lon_max = df_map[lon_col].min(), df_map[lon_col].max()
-
-        # Create base map
-        m = folium.Map(
-            location=[center_lat, center_lon],
-            zoom_start=zoom_start,
-            tiles='OpenStreetMap'
-        )
-
-        # Prepare heatmap data (use df_map with converted coordinates)
-        heat_data = []
-        for idx, row in df_map.iterrows():
-            lat = row[lat_col]
-            lon = row[lon_col]
-
-            if pd.isna(lat) or pd.isna(lon):
-                continue
-
-            if weight_col and weight_col in row:
-                weight = row[weight_col]
-                heat_data.append([lat, lon, weight])
-            else:
-                heat_data.append([lat, lon])
-
-        # Add heatmap layer
-        HeatMap(heat_data).add_to(m)
-
-        # Fit map bounds to show all data points with padding
-        bounds = [[lat_min, lon_min], [lat_max, lon_max]]
-        m.fit_bounds(bounds, padding=[30, 30])
-
-        return m
-
-    def create_choropleth_map(
-        self,
-        df: pd.DataFrame,
-        geo_data: Any,
-        location_col: str,
-        value_col: str,
-        key_on: str = 'feature.properties.name',
-        color_scheme: str = 'blue',
-        zoom_start: int = 6
-    ) -> folium.Map:
-        """
-        Create a choropleth (thematic) map.
-
-        Args:
-            df: DataFrame with data to visualize
-            geo_data: GeoJSON data or path to GeoJSON file
-            location_col: Column in df that matches geo_data features
-            value_col: Column with values to visualize
-            key_on: Property in geo_data to match with location_col
-            color_scheme: Color scheme to use
-            zoom_start: Initial zoom level
-
-        Returns:
-            Folium Map object
-        """
-        # Create base map (centered on data)
-        m = folium.Map(
-            location=[37.5665, 126.9780],  # Default: Seoul
-            zoom_start=zoom_start,
-            tiles='OpenStreetMap'
-        )
-
-        # Create choropleth
-        folium.Choropleth(
-            geo_data=geo_data,
-            name='choropleth',
-            data=df,
-            columns=[location_col, value_col],
-            key_on=key_on,
-            fill_color=color_scheme.capitalize(),
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name=value_col
-        ).add_to(m)
-
-        folium.LayerControl().add_to(m)
-
-        return m
-
-    def map_to_html(self, folium_map: folium.Map) -> str:
-        """
-        Convert Folium map to HTML string.
-
-        Args:
-            folium_map: Folium Map object
-
-        Returns:
-            HTML string representation of the map
-        """
-        return folium_map._repr_html_()
 
     def auto_create_map(
         self,
@@ -750,7 +600,7 @@ class MapHelper:
             map_type: Type of map ('auto', 'point', 'heatmap', 'polygon')
 
         Returns:
-            Plotly Figure for polygon data, Folium Map for point/heatmap data, or None if mapping not possible
+            Plotly Figure object, or None if mapping not possible
         """
         can_map, reason = self.can_create_map(df)
         if not can_map:
@@ -809,14 +659,11 @@ class MapHelper:
                 color_col = categorical_cols[0]
                 print(f"🎨 Auto-detected category column for colors: '{color_col}'")
 
-            if map_type == "heatmap":
-                return self.create_heatmap(df, lat_col, lon_col)
-            else:
-                # Default to point map with category colors (returns Folium Map)
-                return self.create_point_map(
-                    df, lat_col, lon_col,
-                    popup_cols=popup_cols,
-                    color_col=color_col
-                )
+            # Default to point map with category colors (returns Plotly Figure)
+            return self.create_point_map(
+                df, lat_col, lon_col,
+                popup_cols=popup_cols,
+                color_col=color_col
+            )
 
         return None
