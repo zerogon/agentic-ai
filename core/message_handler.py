@@ -231,27 +231,17 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 plotly_fig = None
 
                                 if selected_chart == "map":
-                                    # Try to create map (returns Plotly Figure for polygon data, Folium Map for point data)
+                                    # Try to create map (returns Plotly Figure)
                                     map_result = data_helper.create_folium_map(msg["data"])
 
                                     if map_result:
-                                        # Check if it's a Plotly Figure (polygon map) or Folium Map (point map)
-                                        if hasattr(map_result, 'to_html'):
-                                            # It's a Plotly Figure
-                                            plotly_fig = map_result
-                                            st.plotly_chart(
-                                                plotly_fig,
-                                                use_container_width=True,
-                                                config={'responsive': True, 'displayModeBar': False}
-                                            )
-                                        elif hasattr(map_result, '_repr_html_'):
-                                            # It's a Folium Map
-                                            folium_map = map_result
-                                            st.components.v1.html(
-                                                folium_map._repr_html_(),
-                                                height=600,
-                                                scrolling=True
-                                            )
+                                        # It's a Plotly Figure
+                                        plotly_fig = map_result
+                                        st.plotly_chart(
+                                            plotly_fig,
+                                            use_container_width=True,
+                                            config={'responsive': True, 'displayModeBar': False}
+                                        )
                                     else:
                                         # Fallback to bar chart if map fails
                                         plotly_fig = data_helper.create_chart(
@@ -274,8 +264,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     if plotly_fig:
                                         st.plotly_chart(plotly_fig, use_container_width=True)
 
-                                # Show data table (skip for maps - both Folium and Plotly)
-                                is_map_chart = selected_chart == "map" and (folium_map is not None or plotly_fig is not None)
+                                # Show data table (skip for maps)
+                                is_map_chart = selected_chart == "map" and plotly_fig is not None
 
                                 if not is_map_chart:
                                     st.markdown("**📋 Data:**")
@@ -290,10 +280,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     "domain": "REGION_GENIE"
                                 }
 
-                                # Store map or chart as HTML
-                                if folium_map:
-                                    message_data["folium_map"] = folium_map._repr_html_()
-                                elif plotly_fig:
+                                # Store chart as HTML
+                                if plotly_fig:
                                     message_data["chart_data"] = plotly_fig.to_html(
                                         include_plotlyjs='cdn',
                                         div_id=f'plotly-chart-{len(st.session_state.messages)}'
