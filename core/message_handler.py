@@ -11,7 +11,7 @@ from core.config import get_space_id_by_domain
 from prompts.manager import load_prompt
 
 
-def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None, stream_container=None):
+def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_endpoint: str = None, stream_container=None, spinner_container=None):
     """
     Analyze data using LLM and generate insights with streaming support.
     Supports inq-based dynamic prompt selection.
@@ -22,6 +22,7 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
         data_list: List of dicts with {"domain": str, "data": DataFrame, "content": str}
         llm_endpoint: LLM endpoint name (optional)
         stream_container: Streamlit container for streaming display (optional)
+        spinner_container: Streamlit spinner to hide when first token arrives (optional)
 
     Returns:
         Dict with success, content, and error keys
@@ -81,12 +82,18 @@ def analyze_data_with_llm(w: WorkspaceClient, prompt: str, data_list: list, llm_
             if stream_container and len(grouped_data) == 1:
                 # Only use streaming if single group (to avoid multiple streams)
                 full_response = ""
+                first_token = True
                 for chunk in llm_helper.chat_completion_stream(
                     endpoint_name=llm_endpoint,
                     messages=analysis_messages,
                     temperature=0.3,
                     max_tokens=2000
                 ):
+                    # Hide spinner when first token arrives
+                    if first_token and spinner_container:
+                        spinner_container.empty()
+                        first_token = False
+
                     full_response += chunk
                     stream_container.markdown(full_response)
 
@@ -184,7 +191,7 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                         loading_container,
                         video_id,
                         message_id,
-                        "✅ Complete"
+                        "Complete"
                     )
                     time.sleep(0.3)
 
@@ -305,16 +312,25 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
 
                     # LLM Analysis (mandatory for all responses with data)
                     if data_for_llm:
-                        # Show spinner only during LLM analysis
-                        with st.spinner("Analyzing data..."):
-                            # Stream LLM analysis
-                            insight_container = st.empty()
+                        # Create containers
+                        spinner_placeholder = st.empty()
+                        insight_container = st.empty()
 
-                            # Get LLM endpoint
-                            llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
+                        # Get LLM endpoint
+                        llm_endpoint = st.secrets.get("databricks", {}).get("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 
-                            # Stream and get final result
-                            llm_result = analyze_data_with_llm(w, prompt, data_for_llm, llm_endpoint, stream_container=insight_container)
+                        # Show spinner (will be hidden when first token arrives)
+                        with spinner_placeholder:
+                            with st.spinner("Analyzing data..."):
+                                # Stream and get final result
+                                llm_result = analyze_data_with_llm(
+                                    w,
+                                    prompt,
+                                    data_for_llm,
+                                    llm_endpoint,
+                                    stream_container=insight_container,
+                                    spinner_container=spinner_placeholder
+                                )
 
                         if llm_result["success"]:
                             insight_text = llm_result["content"]
