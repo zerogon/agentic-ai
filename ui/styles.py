@@ -1,5 +1,33 @@
 import streamlit as st
 from ui.theme_config import get_theme
+import base64
+from pathlib import Path
+
+
+def get_available_logos():
+    """Get list of available logo images."""
+    static_dir = Path("static")
+    logos = []
+    for ext in ["*.png", "*.jpg", "*.jpeg"]:
+        logos.extend(static_dir.glob(ext))
+    return [logo.name for logo in sorted(logos)]
+
+
+def get_logo_base64(logo_name="logo.png"):
+    """
+    Get base64 encoded logo image.
+
+    Args:
+        logo_name: Name of logo file in static/ directory (e.g., "logo.png", "logo2.png")
+
+    Returns:
+        Base64 encoded string or None if file not found
+    """
+    logo_path = Path("static") / logo_name
+    if logo_path.exists():
+        with open(logo_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
 
 def apply_custom_styles():
@@ -76,7 +104,7 @@ def apply_custom_styles():
         font-size: 2.25rem;
         font-weight: 700;
         margin-top: 0.5rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
         color: {theme["header_color"]};
         letter-spacing: -0.01em;
     }}
@@ -316,7 +344,6 @@ def apply_custom_styles():
         border-radius: 0.75rem;
         background: {theme["input_background"]};
         color: {theme["text_color"]};
-        border: 1.5px solid {theme["input_border"]};
         width: 100%;
         transition: all 0.3s ease;
         backdrop-filter: blur(12px);

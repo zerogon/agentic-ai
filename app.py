@@ -4,7 +4,7 @@ import streamlit as st
 from core.config import init_databricks_client, get_config
 
 # Import UI components
-from ui.styles import apply_custom_styles
+from ui.styles import apply_custom_styles, get_logo_base64
 from ui.sidebar import render_sidebar
 from ui.session import init_session_state
 from ui.chat_display import display_messages
@@ -38,8 +38,16 @@ init_session_state(config["ai_mode"])
 if not st.session_state.messages:
     display_landing_page()
 else:
-    # Main header
-    st.markdown('<div class="main-header">💬 SK Shieldus Chat Bot</div>', unsafe_allow_html=True)
+    # Main header with logo
+    logo_b64 = get_logo_base64("logo2.png")
+    if logo_b64:
+        st.markdown(f'''
+            <div class="main-header">
+               💬 SK Shieldus Chat Bot
+            </div>
+        ''', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="main-header">💬 SK Shieldus Chat Bot</div>', unsafe_allow_html=True)
     st.markdown("Ask questions about your data in natural language and get instant insights.")
     st.divider()
 

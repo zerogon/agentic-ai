@@ -2,14 +2,23 @@ import streamlit as st
 from ui.session import create_new_session, switch_session, get_session_preview
 from core.config import get_config, init_databricks_client
 from utils.report_generator import generate_business_report, generate_report_preview
+from ui.styles import get_logo_base64
 from datetime import datetime
 
 
 def render_sidebar():
     """Render the sidebar with chat history, search, and controls."""
     with st.sidebar:
-        # Header with title and message count
-        st.markdown('<div class="sidebar-header">SK Shieldus Chat</div>', unsafe_allow_html=True)
+        # Header with logo and message count
+        logo_b64 = get_logo_base64("logo2.png")
+        if logo_b64:
+            st.markdown(f'''
+                <div class="sidebar-header">
+                    <img src="data:image/png;base64,{logo_b64}" style="height: 55px; vertical-align: middle; margin-right: 8px;">
+                </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="sidebar-header">Chat</div>', unsafe_allow_html=True)
 
         total_messages = len(st.session_state.get("messages", []))
         if total_messages > 0:
@@ -123,92 +132,92 @@ def render_sidebar():
             preview = generate_report_preview(messages)
 
             # Show report stats
-            if preview["total_queries"] > 0:
-                # Initialize report data in session state
-                if "generated_report" not in st.session_state:
-                    st.session_state.generated_report = None
+            # if preview["total_queries"] > 0:
+            #     # Initialize report data in session state
+            #     if "generated_report" not in st.session_state:
+            #         st.session_state.generated_report = None
 
-                # Generate Report Button
-                if st.button("📄 Generate Report", use_container_width=True, key="gen_report_btn"):
-                    with st.spinner("Generating..."):
-                        # Get Databricks client
-                        w = init_databricks_client()
+            #     # Generate Report Button
+            #     if st.button("📄 Generate Report", use_container_width=True, key="gen_report_btn"):
+            #         with st.spinner("Generating..."):
+            #             # Get Databricks client
+            #             w = init_databricks_client()
 
-                        # Generate report
-                        result = generate_business_report(
-                            w=w,
-                            messages=messages,
-                            title=f"Business Analysis Report - {datetime.now().strftime('%Y-%m-%d')}",
-                            author="Databricks Data Chat"
-                        )
+            #             # Generate report
+            #             result = generate_business_report(
+            #                 w=w,
+            #                 messages=messages,
+            #                 title=f"Business Analysis Report - {datetime.now().strftime('%Y-%m-%d')}",
+            #                 author="Databricks Data Chat"
+            #             )
 
-                        # Store result in session state
-                        st.session_state.generated_report = result
+            #             # Store result in session state
+            #             st.session_state.generated_report = result
 
-                # Show download buttons if report exists
-                if st.session_state.generated_report is not None:
-                    result = st.session_state.generated_report
+            #     # Show download buttons if report exists
+            #     if st.session_state.generated_report is not None:
+            #         result = st.session_state.generated_report
 
-                    if result["success"]:
-                        # Compact success message
-                        st.markdown(
-                            '<div style="font-size: 0.75rem; color: #10b981; text-align: center; margin: 0.25rem 0;">✅ Ready</div>',
-                            unsafe_allow_html=True
-                        )
+            #         if result["success"]:
+            #             # Compact success message
+            #             st.markdown(
+            #                 '<div style="font-size: 0.75rem; color: #10b981; text-align: center; margin: 0.25rem 0;">✅ Ready</div>',
+            #                 unsafe_allow_html=True
+            #             )
 
-                        # Create compact download buttons
-                        col1, col2 = st.columns(2)
+            #             # Create compact download buttons
+            #             col1, col2 = st.columns(2)
 
-                        with col1:
-                            st.download_button(
-                                label="PDF",
-                                data=result["pdf"],
-                                file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                                mime="application/pdf",
-                                use_container_width=True,
-                                key="download_pdf_btn"
-                            )
+            #             with col1:
+            #                 st.download_button(
+            #                     label="PDF",
+            #                     data=result["pdf"],
+            #                     file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            #                     mime="application/pdf",
+            #                     use_container_width=True,
+            #                     key="download_pdf_btn"
+            #                 )
 
-                        with col2:
-                            st.download_button(
-                                label="HTML",
-                                data=result["html"],
-                                file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                                mime="text/html",
-                                use_container_width=True,
-                                key="download_html_btn"
-                            )
+            #             with col2:
+            #                 st.download_button(
+            #                     label="HTML",
+            #                     data=result["html"],
+            #                     file_name=f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+            #                     mime="text/html",
+            #                     use_container_width=True,
+            #                     key="download_html_btn"
+            #                 )
 
-                        # Compact clear button
-                        if st.button("🔄 New", use_container_width=True, key="clear_report_btn"):
-                            st.session_state.generated_report = None
-                            st.rerun()
-                    else:
-                        st.markdown(
-                            f'<div style="font-size: 0.75rem; color: #ef4444; text-align: center; margin: 0.25rem 0;">❌ {result.get("error", "Error")}</div>',
-                            unsafe_allow_html=True
-                        )
-                        if st.button("🔄 Retry", use_container_width=True, key="retry_report_btn"):
-                            st.session_state.generated_report = None
-                            st.rerun()
-            else:
-                # Compact empty state
-                st.markdown("""
-                <div style="
-                    background: rgba(59, 130, 246, 0.05);
-                    border: 1px solid rgba(91, 143, 212, 0.2);
-                    border-radius: 0.5rem;
-                    padding: 0.75rem;
-                    margin: 0.25rem 0;
-                    text-align: center;
-                ">
-                    <div style="font-size: 0.75rem; color: #6b7280;">
-                        📊 Generate reports from chat data
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            #             # Compact clear button
+            #             if st.button("🔄 New", use_container_width=True, key="clear_report_btn"):
+            #                 st.session_state.generated_report = None
+            #                 st.rerun()
+            #         else:
+            #             st.markdown(
+            #                 f'<div style="font-size: 0.75rem; color: #ef4444; text-align: center; margin: 0.25rem 0;">❌ {result.get("error", "Error")}</div>',
+            #                 unsafe_allow_html=True
+            #             )
+            #             if st.button("🔄 Retry", use_container_width=True, key="retry_report_btn"):
+            #                 st.session_state.generated_report = None
+            #                 st.rerun()
+            # else:
+            #     # Compact empty state
+            #     st.markdown("""
+            #     <div style="
+            #         background: rgba(59, 130, 246, 0.05);
+            #         border: 1px solid rgba(91, 143, 212, 0.2);
+            #         border-radius: 0.5rem;
+            #         padding: 0.75rem;
+            #         margin: 0.25rem 0;
+            #         text-align: center;
+            #     ">
+            #         <div style="font-size: 0.75rem; color: #6b7280;">
+            #             📊 Generate reports from chat data
+            #         </div>
+            #     </div>
+            #     """, unsafe_allow_html=True)
 
-            st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
+            # st.markdown('<div style="height: 0.75rem;"></div>', unsafe_allow_html=True)
 
         # Clear All Sessions Button
         if st.button("🗑️ Clear All Sessions", use_container_width=True, key="clear_btn"):

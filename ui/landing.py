@@ -1,4 +1,5 @@
 import streamlit as st
+from ui.styles import get_logo_base64
 from ui.theme_config import get_theme
 
 
@@ -91,14 +92,24 @@ def display_landing_page():
     </style>
     """, unsafe_allow_html=True)
 
-    # Hero section
-    st.markdown("""
-    <div class="landing-hero">
-        <div class="landing-logo">💬</div>
-        <h2 class="landing-title">SK Shieldus Chat Bot</h2>
- 
-    </div>
-    """, unsafe_allow_html=True)
+    # Hero section with logo
+    logo_b64 = get_logo_base64("logo.png")
+    if logo_b64:
+        st.markdown(f"""
+        <div class="landing-hero">
+            <div class="landing-logo">💬</div>
+            <div class="main-header">
+               SK Shieldus Chat Bot
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="landing-hero">
+            <div class="landing-logo">💬</div>
+            <h3 class="landing-title">Chat Bot</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Feature cards in 2x2 grid
     col1, col2 = st.columns(2, gap="large")
@@ -151,10 +162,10 @@ def display_landing_page():
         """, unsafe_allow_html=True)
 
     # CTA section
-    st.markdown("""
-    <div class="cta-section">
-        <p class="cta-text">
-            Start by typing your question below or explore <span class="highlight">sample queries</span> from the sidebar
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div class="cta-section">
+    #     <p class="cta-text">
+    #         Start by typing your question below or explore <span class="highlight">sample queries</span> from the sidebar
+    #     </p>
+    # </div>
+    # """, unsafe_allow_html=True)
