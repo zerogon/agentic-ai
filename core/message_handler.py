@@ -5,7 +5,7 @@ from databricks.sdk import WorkspaceClient
 from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
 from utils.llm_helper import LLMHelper
-from utils.loading_helper import display_loading_video, remove_loading_video, update_loading_message
+from utils.loading_helper import display_loading_video, remove_loading_video, update_loading_message, display_loading_with_sequential_messages, update_to_next_message
 from ui.session import update_current_session_messages
 from core.config import get_space_id_by_domain
 from prompts.manager import load_prompt
@@ -160,12 +160,22 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
             if ai_mode == "Genie API" and genie_space_id:
                 # Simplified flow: Direct REGION_GENIE query → Map detection → LLM analysis
 
-                # Show loading video
-                loading_container, video_id, message_id = display_loading_video(
-                    width=600,
-                    loop=True,
-                    message="Processing query"
+                # Show loading video with sequential messages
+                loading_state = display_loading_with_sequential_messages(
+                    messages=None,  # Use default messages from loading_helper.DEFAULT_LOADING_MESSAGES
+                    interval=1.5,
+                    width=600
                 )
+                loading_container = loading_state["container"]
+                video_id = loading_state["video_id"]
+                message_id = loading_state["message_id"]
+
+                # Message 1: "Understanding query" (already shown)
+                time.sleep(0.8)
+
+                # Message 2: "Connecting to Genie"
+                update_to_next_message(loading_state)
+                time.sleep(0.8)
 
                 # Get REGION_GENIE Space ID
                 region_space_id = get_space_id_by_domain("REGION_GENIE")
@@ -173,8 +183,9 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 # Execute REGION_GENIE query
                 genie = GenieHelper(w, region_space_id)
 
-                # No status container - loading video handles all visual feedback
-                # Progress tracking disabled to avoid showing "Processing query..."
+                # Message 3: "Generating SQL"
+                update_to_next_message(loading_state)
+
                 # Get conversation ID for REGION_GENIE
                 conv_id = st.session_state.conversation_ids.get("REGION_GENIE")
 
@@ -185,8 +196,16 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                     # Start new conversation
                     result = genie.start_conversation(prompt)
 
+                # Message 4: "Fetching data"
+                update_to_next_message(loading_state)
+                time.sleep(0.5)
+
+                # Message 5: "Preparing results"
+                update_to_next_message(loading_state)
+                time.sleep(0.5)
+
                 if result["success"]:
-                    # Update loading message
+                    # Show completion message briefly
                     update_loading_message(
                         loading_container,
                         video_id,

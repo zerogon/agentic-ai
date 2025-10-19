@@ -2,7 +2,17 @@ import streamlit as st
 import base64
 import time
 import uuid
+import threading
 from pathlib import Path
+
+# Default loading messages (can be customized)
+DEFAULT_LOADING_MESSAGES = [
+    "Understanding query",
+    "Connecting to Genie",
+    "Generating SQL",
+    "Fetching data",
+    "Preparing results"
+]
 
 
 def display_loading_video(video_path: str = "static/test.mp4", width: int = 600, loop: bool = True, message: str = ""):
@@ -49,8 +59,8 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             100% {{ background-position: 1000px 0; }}
         }}
         @keyframes spin {{
-            0% {{ transform: translate(-50%, -50%) rotate(0deg); }}
-            100% {{ transform: translate(-50%, -50%) rotate(360deg); }}
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
         }}
         @keyframes dots {{
             0%, 20% {{ content: '.'; }}
@@ -92,7 +102,7 @@ def display_loading_video(video_path: str = "static/test.mp4", width: int = 600,
             Your browser does not support the video tag.
         </video>
         <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 12px; font-size: 18px; font-weight: 600; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite; line-height: 1.2;">
-            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; position: relative; top: 4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; transform-origin: center;">
                 <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round" />
             </svg><span class="loading-dots" style="display: inline-block; vertical-align: middle;">{message if message else ""}</span>
         </div>
@@ -143,8 +153,8 @@ def update_loading_message(container, video_id: str, message_id: str, new_messag
             100% {{ background-position: 1000px 0; }}
         }}
         @keyframes spin {{
-            0% {{ transform: translate(-50%, -50%) rotate(0deg); }}
-            100% {{ transform: translate(-50%, -50%) rotate(360deg); }}
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
         }}
         @keyframes dots {{
             0%, 20% {{ content: '.'; }}
@@ -185,8 +195,8 @@ def update_loading_message(container, video_id: str, message_id: str, new_messag
             <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
             Your browser does not support the video tag.
         </video>
-        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 20px 30px; border-radius: 12px; font-size: 18px; font-weight: 600; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite; line-height: 1.2;">
-            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; position: relative; top: 2px;">
+        <div id="{message_id}" class="progress-border" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px; border-radius: 12px; font-size: 18px; font-weight: 600; z-index: 10; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); max-width: 80%; word-wrap: break-word; animation: pulse 2s ease-in-out infinite; line-height: 1.2;">
+            <svg width="16" height="16" viewBox="0 0 24 24" style="animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 8px; transform-origin: center;">
                 <circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round" />
             </svg><span class="loading-dots" style="display: inline-block; vertical-align: middle;">{new_message if new_message else ""}</span>
         </div>
@@ -213,3 +223,83 @@ def remove_loading_video(container, video_id=None, fade_duration: float = 0.5):
     # Brief pause for visual continuity
     time.sleep(fade_duration)
     container.empty()
+
+
+def display_loading_with_sequential_messages(
+    messages: list = None,
+    interval: float = 1.5,
+    video_path: str = "static/test.mp4",
+    width: int = 600
+):
+    """
+    Display loading video with sequential messages that update automatically.
+
+    Args:
+        messages: List of messages to display sequentially (default: DEFAULT_LOADING_MESSAGES)
+        interval: Time between message updates in seconds (default: 1.5)
+        video_path: Path to the video file (default: static/test.mp4)
+        width: Width of the video in pixels (default: 600)
+
+    Returns:
+        Dict with:
+            - container: Streamlit container
+            - video_id: Unique ID of video element
+            - message_id: Unique ID of message element
+            - messages: List of messages
+            - current_index: Current message index (stored in session state)
+
+    Example:
+        >>> # Start loading with sequential messages
+        >>> loading_state = display_loading_with_sequential_messages()
+        >>>
+        >>> # Update to next message
+        >>> update_to_next_message(loading_state)
+        >>>
+        >>> # Remove loading video
+        >>> remove_loading_video(loading_state["container"])
+    """
+    if messages is None:
+        messages = DEFAULT_LOADING_MESSAGES.copy()
+
+    # Start with first message
+    container, video_id, message_id = display_loading_video(
+        video_path=video_path,
+        width=width,
+        loop=True,
+        message=messages[0] if messages else ""
+    )
+
+    return {
+        "container": container,
+        "video_id": video_id,
+        "message_id": message_id,
+        "messages": messages,
+        "current_index": 0,
+        "video_path": video_path,
+        "width": width
+    }
+
+
+def update_to_next_message(loading_state: dict):
+    """
+    Update to the next message in the sequence.
+
+    Args:
+        loading_state: Dict returned from display_loading_with_sequential_messages()
+    """
+    if not loading_state or not loading_state.get("messages"):
+        return
+
+    # Move to next message
+    loading_state["current_index"] = (loading_state["current_index"] + 1) % len(loading_state["messages"])
+    next_message = loading_state["messages"][loading_state["current_index"]]
+
+    # Update display
+    update_loading_message(
+        loading_state["container"],
+        loading_state["video_id"],
+        loading_state["message_id"],
+        next_message,
+        video_path=loading_state.get("video_path", "static/test.mp4"),
+        width=loading_state.get("width", 600)
+    )
