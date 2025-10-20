@@ -297,13 +297,16 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     st.markdown("**📋 Data:**")
                                     st.dataframe(msg["data"], use_container_width=True)
 
-                                # Add to chat history (without content text)
+                                # Add to chat history with display state preservation
                                 message_data = {
                                     "role": "assistant",
-                                    "content": "",  # Hide content, only show SQL/charts/tables
+                                    "content": msg.get("content", ""),  # Preserve Genie response text
                                     "code": msg.get("code"),
                                     "table_data": msg["data"],
-                                    "domain": "REGION_GENIE"
+                                    "domain": "REGION_GENIE",
+                                    # Display state preservation
+                                    "sql_expanded": False,  # SQL starts collapsed
+                                    "show_table": not is_map_chart  # Hide table for maps
                                 }
 
                                 # Store chart as HTML
@@ -314,6 +317,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     )
 
                                 st.session_state.messages.append(message_data)
+                                # Immediately sync after adding message
+                                update_current_session_messages()
                             else:
                                 # Text-only response
                                 st.session_state.messages.append({
@@ -321,6 +326,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     "content": msg["content"],
                                     "domain": "REGION_GENIE"
                                 })
+                                # Immediately sync after adding message
+                                update_current_session_messages()
                         else:
                             # Text-only response
                             st.session_state.messages.append({
@@ -328,6 +335,8 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 "content": msg["content"],
                                 "domain": "REGION_GENIE"
                             })
+                            # Immediately sync after adding message
+                            update_current_session_messages()
 
                     # LLM Analysis (mandatory for all responses with data)
                     if data_for_llm:
@@ -356,17 +365,23 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                             # Add LLM insight to chat history
                             st.session_state.messages.append({
                                 "role": "assistant",
-                                "content": f"💡 **LLM Analysis**\n\n{insight_text}"
+                                "content": f"💡 **LLM Analysis**\n\n{insight_text}",
+                                "is_llm_analysis": True  # Flag to distinguish from Genie responses
                             })
+                            # Immediately sync after adding LLM insight
+                            update_current_session_messages()
                         else:
                             error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
                             st.error(error_msg)
                             st.session_state.messages.append({
                                 "role": "assistant",
-                                "content": error_msg
+                                "content": error_msg,
+                                "is_llm_analysis": True  # Error is also LLM-related
                             })
+                            # Immediately sync after adding error message
+                            update_current_session_messages()
 
-                    # Update session after all messages processed
+                    # Final sync after all messages processed (redundant but safe)
                     update_current_session_messages()
                 else:
                     # Remove loading video on error

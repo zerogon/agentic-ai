@@ -2,17 +2,26 @@ import streamlit as st
 
 
 def display_messages():
-    """Display chat messages from session state."""
-    for message in st.session_state.messages:
+    """Display chat messages from session state with exact state preservation."""
+    for idx, message in enumerate(st.session_state.messages):
+        # Generate unique key for this message based on index and content hash
+        msg_hash = hash(str(message.get("content", ""))[:50])  # Hash first 50 chars for stability
+
         with st.chat_message(message["role"]):
-            # Only show content for user messages, skip for assistant (Genie responses)
+            # Display content for all messages (user and assistant)
             if message["role"] == "user":
                 st.markdown(message["content"])
+            elif message["role"] == "assistant":
+                # Show assistant content (Genie responses and LLM Analysis)
+                if message.get("content"):
+                    st.markdown(message["content"])
 
-            # Display SQL code if present (without expander to avoid nesting)
+            # Display SQL code with saved expander state
             if "code" in message and message["code"]:
-                st.caption("📝 Generated SQL:")
-                st.code(message["code"], language="sql")
+                # Restore expander state from message (default collapsed)
+                expanded_state = message.get("sql_expanded", False)
+                with st.expander("📝 Generated SQL", expanded=expanded_state):
+                    st.code(message["code"], language="sql")
 
             # Display Plotly visualization if present
             if "chart_data" in message:
@@ -28,8 +37,17 @@ def display_messages():
                     )
                 else:
                     # Plotly Figure object - use plotly_chart (legacy compatibility)
-                    st.plotly_chart(chart_data, use_container_width=True)
+                    st.plotly_chart(
+                        chart_data,
+                        use_container_width=True,
+                        key=f"chart_{idx}_{msg_hash}"
+                    )
 
-            # Display table if present
-            if "table_data" in message and not message["table_data"].empty:
-                st.dataframe(message["table_data"], use_container_width=True)
+            # Display table only if show_table flag is True (conditional display)
+            if message.get("show_table", True) and "table_data" in message and not message["table_data"].empty:
+                st.markdown("**📋 Data:**")
+                st.dataframe(
+                    message["table_data"],
+                    use_container_width=True,
+                    key=f"table_{idx}_{msg_hash}"
+                )

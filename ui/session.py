@@ -1,6 +1,7 @@
 import streamlit as st
 import uuid
 from datetime import datetime
+import copy
 
 
 def init_session_state(ai_mode: str):
@@ -64,7 +65,8 @@ def switch_session(session_id: str):
 
     if session:
         st.session_state.current_session_id = session_id
-        st.session_state.messages = session["messages"].copy()
+        # Use deep copy to ensure complete independence
+        st.session_state.messages = copy.deepcopy(session["messages"])
 
         # Clear Genie conversation IDs when switching sessions
         if "conversation_ids" in st.session_state:
@@ -89,7 +91,8 @@ def update_current_session_messages():
 
     for session in st.session_state.chat_sessions:
         if session["id"] == st.session_state.current_session_id:
-            session["messages"] = st.session_state.messages.copy()
+            # Use deep copy to prevent reference sharing
+            session["messages"] = copy.deepcopy(st.session_state.messages)
 
             # Update first_user_message if not set
             if session["first_user_message"] is None:
