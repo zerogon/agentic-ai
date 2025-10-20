@@ -576,9 +576,12 @@ class MapHelper:
             hover_data_rank = {
                 '1인여성가구_홈보안침투율': True,  # Show only this column
                 '_color_rank': False,  # Hide internal color column
-                'inq': False,  # Hide other columns
-                'rank': False
             }
+
+            # Hide other columns only if they exist in the dataframe
+            for col in ['inq', 'rank']:
+                if col in gdf_plot.columns:
+                    hover_data_rank[col] = False
 
             # Also explicitly hide name_col (행정구역) from hover_data
             if name_col and name_col in gdf_plot.columns:
