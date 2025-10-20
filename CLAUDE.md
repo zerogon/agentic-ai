@@ -1,398 +1,458 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Project Overview
 
-This is a **Databricks Apps** application that provides a chat-based interface for interacting with data using natural language queries. The app integrates multiple AI backends (Genie, Databricks LLM) and generates professional reports (PDF/HTML).
+**SK Shieldus Chat Bot** is a Databricks Apps application that provides a natural language interface for querying regional data. The application uses Databricks Genie API for SQL generation and LLM for business insights.
 
-**Key constraint**: Databricks Apps requires a single-process architecture. There is no separate backend/frontend - everything runs in one Streamlit process.
+**Key Constraint**: Single-process architecture required by Databricks Apps - everything runs in one Streamlit process without separate backend/frontend.
 
 ## Architecture
 
 ### Core Design Pattern
 
-```
-app.py (Streamlit UI + Business Logic)
-    ↓
-Helper Modules (utils/)
-    ↓
-External Services (Databricks SDK, Plotly)
-```
+**Single-Process Flow**:
+- Streamlit UI + Business Logic in one unified process
+- Helper modules for reusable business logic
+- Direct Databricks SDK calls from Streamlit
+- Authentication via Databricks Apps headers
 
-**Why this matters**:
-- Don't try to separate into Flask backend + Streamlit frontend
-- All API calls happen directly from Streamlit via SDK
-- Authentication is handled via Databricks Apps headers (`st.context.headers`)
-- WorkspaceClient auto-authenticates when deployed to Databricks Apps
+### Project Structure
 
-### Helper Module Architecture
+**Entry Point**:
+- `app.py` - Streamlit application entry point
 
-All business logic is in `utils/` as standalone helper classes:
+**Core Components** (`core/`):
+- `config.py` - Databricks client initialization and configuration
+- `message_handler.py` - Chat input processing and response handling
 
-1. **`genie_helper.py`**: Databricks Genie API (NL2SQL)
-   - `start_conversation()` - Start new Genie conversation
-   - `continue_conversation()` - Multi-turn conversations
-   - `process_response()` - Parse Genie responses into messages with data/code
+**UI Components** (`ui/`):
+- `sidebar.py` - Sidebar with settings and report generation
+- `chat_display.py` - Message rendering with visualizations
+- `session.py` - Session state management
+- `styles.py` - Custom CSS styling
+- `landing.py` - Landing page display
+- `theme_config.py` - Theme configurations
 
-2. **`llm_helper.py`**: Multi-provider LLM interface
-   - Supports **two providers**: `databricks`
-   - Single unified interface: `chat_completion()` works for both
-   - Provider switching via `provider` parameter in constructor
-   - **Important**: For Databricks provider, pass `WorkspaceClient`
+**Helper Modules** (`utils/`):
+- `genie_helper.py` - Databricks Genie API (NL2SQL conversion)
+- `llm_helper.py` - LLM endpoint interface
+- `data_helper.py` - Data visualization and charts
+- `map_helper.py` - Geospatial visualization
+- `report_helper.py` - PDF/HTML report generation
+- `report_generator.py` - Business report generation
+- `loading_helper.py` - Loading video display
+- `prompt_selector.py` - Dynamic prompt selection
+- `seoul_boundary.py` - Seoul boundary data
 
-3. **`data_helper.py`**: Visualization and data processing
-   - `create_chart()` - Generate Plotly charts from DataFrames
-   - `auto_detect_chart_type()` - Smart chart type selection
-   - `format_sql_code()` - SQL formatting for display
+**Prompt System** (`prompts/`):
+- `manager.py` - Prompt loading
+- Various `.txt` files for analysis scenarios
 
-4. **`report_helper.py`**: Report generation (PDF/HTML)
-   - `generate_pdf()` - ReportLab-based PDF reports with Korean font support
-   - `generate_html()` - Jinja2-based HTML reports
-   - Accumulate sections with `add_section()`, `add_dataframe()`, `add_chart()`
-   - Korean font handling: AppleSDGothicNeo.ttc → AppleGothic.ttf → Helvetica
-   - Call `clear()` before building new report
+## Key Features
 
-5. **`map_helper.py`**: Geospatial visualization with automatic geometry detection
-   - `auto_create_map()` - Automatically create appropriate map type
-   - `create_point_map()` - Point markers with lat/lon data
-   - `create_polygon_map()` - Polygon/choropleth maps from geometry data
-   - `detect_geo_columns()` - Automatic column detection (lat/lon, geometry)
-   - Priority: Geometry columns → Lat/Lon columns → Other map types
+### Natural Language Querying
+- Users ask questions in natural language
+- Genie API converts queries to SQL
+- Direct REGION_GENIE execution
+- Automatic result processing
 
-6. **`report_generator.py`**: Business report generation from chat sessions
-   - `generate_business_report()` - Generate comprehensive business analysis report
-   - `_extract_conversation_data()` - Extract queries, domains, data samples from messages
-   - `_generate_llm_analysis()` - LLM-based business insights in Korean
-   - `generate_report_preview()` - Preview statistics before generation
+### Automatic Visualization
+- **Geometry Detection**: Automatically detects and creates maps
+- **Chart Generation**: Plotly charts based on data
+- **Interactive Tables**: DataFrames with proper formatting
 
-7. **`loading_helper.py`**: Loading video display during query processing
-   - `display_loading_video()` - Display looping video during async operations
-   - `remove_loading_video()` - Remove loading video after completion
-   - Uses `static/test.mp4` for visual feedback during query processing
+### LLM Analysis
+- **Mandatory**: All data responses include business insights
+- **Streaming**: Real-time response display
+- **Inq-Based Prompts**: Dynamic prompt selection
+- **Korean Support**: Business insights in Korean
 
-### State Management
+### Session Management
+- **Chat History**: Maintains conversation context
+- **Session Switching**: Multiple chat sessions
+- **Message Persistence**: Complete message storage
 
-**Session state keys** (in `st.session_state`):
-- `messages` - Chat history (list of dicts with role/content/chart_data/table_data/code/domain)
-- `conversation_id` - Genie conversation ID for multi-turn queries
-- `chat_sessions` - List of all chat sessions with metadata
-- `current_session_id` - Active session identifier
-- `generated_report` - Cached business report data (PDF and HTML bytes)
+### Report Generation
+- **Business Reports**: Comprehensive analysis from sessions
+- **Multiple Formats**: PDF and HTML export
+- **Korean Support**: Proper font handling
+- **Structured Output**: Executive summary, insights, recommendations
 
-## Development Commands
+### Loading Experience
+- **Video Feedback**: Animated loading video
+- **Sequential Messages**: Step-by-step progress
+- **Smooth Transitions**: Automatic cleanup
+
+## Configuration
+
+### Required Secrets
+
+**Databricks Configuration** (`.streamlit/secrets.toml`):
+- `HOST` - Workspace URL
+- `TOKEN` - Personal access token
+- `GENIE_SPACE_ID` - Default Genie Space ID
+
+**Genie Spaces**:
+- `REGION_GENIE` - Regional data space ID
+
+**LLM Configuration**:
+- `llm_endpoint` - Databricks serving endpoint
+
+### Application Configuration
+
+**app.yaml**: Defines Streamlit command and environment variables for deployment.
+
+## Development
 
 ### Local Development
-```bash
-# Setup environment
-export DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-export DATABRICKS_TOKEN=your-token
 
-# Install dependencies
-pip install -r requirements.txt
+**Setup**:
+1. Install dependencies: `pip install -r requirements.txt`
+2. Configure secrets in `.streamlit/secrets.toml`
+3. Run: `streamlit run app.py`
+4. Access: http://localhost:8501
 
-# Run app locally
-streamlit run app.py
-# App starts at http://localhost:8501
-```
+**Environment Variables**:
+- `DATABRICKS_HOST` - Workspace URL
+- `DATABRICKS_TOKEN` - Access token
 
-### Databricks Apps Deployment
-```bash
-# Authenticate
-databricks auth login --host <workspace-url>
+### Deployment
 
-# Deploy
-databricks apps deploy <app-name> --source-code-path .
-```
+**Databricks Apps**:
+1. Authenticate: `databricks auth login --host <workspace-url>`
+2. Deploy: `databricks apps deploy <app-name> --source-code-path .`
 
-## Working with AI Modes
+## Data Flow
 
-The app uses a **simplified single-Genie architecture**:
+### Query Processing
 
-### Genie API (REGION_GENIE Only)
-- **Best for**: Regional and geographic data queries (NL2SQL)
-- **Requires**: `REGION_GENIE` Space ID in secrets configuration
-- **Simplified Flow**:
-  1. User query → REGION_GENIE (direct, no routing)
-  2. Generate SQL → Execute → Return DataFrame
-  3. **Automatic geometry detection** → Create map if `geometry` column exists
-  4. **Mandatory LLM analysis** → All responses get business insights
-- **Maintains conversation context** automatically per domain
-- **Map Generation**:
-  - Geometry column detected → Folium polygon map
-  - No geometry column → Standard charts/tables
+1. **User Input**: Natural language query submitted
+2. **Loading Phase**: Video display with sequential messages
+3. **Genie Processing**: SQL generation and execution
+4. **Visualization**: Automatic geometry detection and chart creation
+5. **LLM Analysis**: Business insights generation (streaming)
+6. **Session Update**: Messages stored with complete data
 
-## Report Generation
+### Message Structure
 
-### 1. Manual Report Building (Low-level API)
-```python
-from utils.report_helper import ReportHelper
+**User Messages**:
+- `role`: "user"
+- `content`: Query text
 
-report = ReportHelper()
+**Assistant Messages**:
+- `role`: "assistant"
+- `content`: Response text
+- `code`: SQL query (optional)
+- `table_data`: DataFrame (optional)
+- `chart_data`: Plotly HTML (optional)
+- `domain`: Data domain (optional)
+- `is_llm_analysis`: LLM flag (optional)
+- `sql_expanded`: Display state (optional)
+- `show_table`: Display state (optional)
 
-# Add content
-report.add_section("Title", "Text content", "text")
-report.add_dataframe("Data", df)
-report.add_chart("Visualization", plotly_fig)
+## Helper Module Details
 
-# Generate
-pdf_bytes = report.generate_pdf(title="Report", author="User")
-html_str = report.generate_html(title="Report", author="User")
+### GenieHelper
 
-# Clear for next report
-report.clear()
-```
+**Purpose**: Databricks Genie API interface
 
-### 2. Business Report Generation (High-level API)
-```python
-from utils.report_generator import generate_business_report
-from core.config import init_databricks_client
+**Key Methods**:
+- `start_conversation(prompt)` - New conversation
+- `continue_conversation(conversation_id, prompt)` - Follow-up
+- `get_query_result(statement_id)` - Retrieve results
+- `process_response(response)` - Parse responses
+- `set_progress_callback(callback)` - Progress updates
 
-w = init_databricks_client()
-messages = st.session_state.get("messages", [])
+### LLMHelper
 
-result = generate_business_report(
-    w=w,
-    messages=messages,
-    title="Business Analysis Report",
-    author="Databricks Data Chat"
-)
+**Purpose**: LLM completion interface
 
-if result["success"]:
-    pdf_bytes = result["pdf"]
-    html_string = result["html"]
-else:
-    error = result["error"]
-```
+**Key Methods**:
+- `chat_completion()` - Standard completion
+- `chat_completion_stream()` - Streaming responses
+- `text_completion()` - Text-only completion
+- `get_embeddings()` - Generate embeddings
+
+### MapHelper
+
+**Purpose**: Geospatial visualization
+
+**Key Methods**:
+- `create_point_map()` - Point markers
+- `create_choropleth_map()` - Polygon maps
+- `detect_geometry_columns()` - Auto detection
+- `parse_geometry()` - WKT/GeoJSON parsing
 
 **Features**:
-- Extracts all queries, data, and charts from chat session
-- Generates LLM-based business insights in Korean
-- Creates structured report with:
-  - Executive Summary (경영진 요약)
-  - Analysis Details (분석 상세)
-  - Key Insights (주요 인사이트)
-  - Business Recommendations (비즈니스 권장사항)
-  - Conclusion (결론)
-- Supports Korean text in PDF with proper font handling
-- Available in sidebar: "📊 Reports" section with preview and download buttons
+- WKT and GeoJSON support
+- Rank-based coloring
+- Seoul boundary integration
+- Interactive Plotly maps
 
-## Adding New Features
+### ReportHelper
 
-### Adding a New AI Provider
-1. Create `utils/newprovider_helper.py` with `chat_completion()` method
-2. Modify `llm_helper.py` to add provider option:
-   ```python
-   if self.provider == "newprovider":
-       return self.newprovider.chat_completion(...)
-   ```
-3. Add UI config in `app.py` sidebar
-4. Add mode handling in chat input section
+**Purpose**: Low-level report generation
 
-### Adding a New Chart Type
-1. Modify `data_helper.py`:
-   ```python
-   elif chart_type == "newtype":
-       fig = px.newtype(df, ...)
-   ```
-2. Add to chart type selector in `app.py` sidebar
+**Key Methods**:
+- `add_section()` - Add report section
+- `add_dataframe()` - Add data table
+- `add_chart()` - Add visualization
+- `generate_pdf()` - Create PDF
+- `generate_html()` - Create HTML
+- `clear()` - Reset state
 
-### Adding a New Report Format
-1. Add method to `report_helper.py`:
-   ```python
-   def generate_markdown(self, ...):
-       # Implementation
-   ```
-2. Add export button in `app.py` sidebar
+**Features**:
+- ReportLab PDF generation
+- Jinja2 HTML templating
+- Korean font support
+- Plotly chart export
+
+### ReportGenerator
+
+**Purpose**: Business report generation
+
+**Key Functions**:
+- `generate_business_report()` - Full pipeline
+- `generate_report_preview()` - Preview statistics
+- `_extract_conversation_data()` - Parse messages
+- `_generate_llm_analysis()` - LLM insights
+- `_build_report_structure()` - Assemble report
+
+**Report Structure**:
+- Executive Summary (경영진 요약)
+- Analysis Details (분석 상세)
+- Key Insights (주요 인사이트)
+- Business Recommendations (비즈니스 권장사항)
+- Conclusion (결론)
+
+### LoadingHelper
+
+**Purpose**: Visual feedback during operations
+
+**Key Functions**:
+- `display_loading_video()` - Show video
+- `remove_loading_video()` - Hide video
+- `update_loading_message()` - Update text
+- `display_loading_with_sequential_messages()` - Sequential display
+- `update_to_next_message()` - Progress step
+
+**Default Messages**:
+1. "Understanding your query..."
+2. "Connecting to Genie API..."
+3. "Generating SQL query..."
+4. "Fetching data..."
+5. "Preparing results..."
+6. "Complete!"
+
+## State Management
+
+### Session State Keys
+
+**Core State**:
+- `messages` - Chat messages in current session
+- `conversation_id` - Active Genie conversation
+- `conversation_ids` - Domain to conversation map
+- `pending_prompt` - Query awaiting processing
+
+**Session Management**:
+- `chat_sessions` - All chat sessions
+- `current_session_id` - Active session identifier
+- `current_session_index` - Session list index
+
+**Report State**:
+- `generated_report` - Cached report data (dict with 'pdf' and 'html')
+
+### Update Patterns
+
+**Immediate Update**: After every message
+- Add to `st.session_state.messages`
+- Call `update_current_session_messages()`
+- Ensures consistency
+
+**Session Switching**: When changing sessions
+- Load messages from session
+- Update identifiers and indices
+- Restore conversation context
 
 ## Important Constraints
 
-1. **Databricks Apps Limitations**:
-   - Single process only (no separate API server)
-   - Uses Streamlit's app model
-   - Authentication via headers, not manual token passing
+### Databricks Apps
+- Single process only
+- No separate API server
+- Authentication via headers
+- WorkspaceClient auto-authenticates
 
-2. **Genie API**:
-   - Requires valid Genie Space ID
-   - Returns conversation objects with attachments
-   - SQL results accessed via `statement_id` → `get_statement()`
+### Genie API
+- Valid Space ID required
+- User permissions needed
+- Conversation IDs per domain
+- Statement ID for results
 
-3. **Report Generation**:
-   - PDF requires kaleido for Plotly image export
-   - HTML embeds Plotly.js (large file size)
-   - Tables truncated to 50 rows in PDF
-   - Korean font support requires macOS system fonts (AppleSDGothicNeo.ttc or AppleGothic.ttf)
-   - Report data persists in `st.session_state.generated_report` for download button stability
+### Report Generation
+- kaleido 0.2.1 for Plotly export
+- Korean fonts required (macOS)
+- Table truncation (50 rows)
+- Large HTML files with Plotly.js
 
+**Font Fallback**:
+1. AppleSDGothicNeo.ttc
+2. AppleGothic.ttf
+3. Helvetica
 
-## Configuration Files
+### Performance
+- LLM temperature: 0.3
+- LLM max_tokens: 2000
+- DataFrame preview: 10 rows
+- Streaming for UX
 
-### app.yaml (Databricks Apps Config)
-```yaml
-command: ['streamlit', 'run', 'app.py']
-env:
-  - name: 'STREAMLIT_SERVER_HEADLESS'
-    value: 'true'
-```
-**Do not add Flask/Gunicorn** - Databricks Apps expects single Streamlit command.
+## File References
 
-### requirements.txt
-Core dependencies:
-- `streamlit>=1.28.0` - UI framework
-- `databricks-sdk>=0.23.0` - Databricks API client
-- `plotly>=5.17.0` - Visualizations
-- `reportlab>=4.0.0` - PDF generation
+Use this format for code locations:
+- `app.py:17` - Page configuration
+- `core/config.py:7` - Client init
+- `core/message_handler.py:135` - Chat handler
+- `utils/genie_helper.py:38` - Conversation start
+- `utils/llm_helper.py:32` - Chat completion
+- `utils/map_helper.py:64` - Auto zoom
+- `utils/report_generator.py:16` - Report generation
+- `ui/sidebar.py:1` - Sidebar rendering
+
+## Dependencies
+
+### Core Framework
+- `streamlit==1.50.0` - UI framework
+- `pandas>=2.0.0` - Data manipulation
+
+### Databricks Integration
+- `databricks-sdk==0.67.0` - API client
+- `databricks-sql-connector>=3.0.0` - SQL execution
+
+### Visualization
+- `plotly>=5.17.0` - Interactive charts
+- `kaleido>=0.2.1` - Chart export
+
+### Geospatial
+- `geopandas>=0.14.0` - Geometry handling
+- `shapely>=2.0.0` - Geometry operations
+- `pyproj>=3.6.0` - Coordinate transforms
+
+### Report Generation
+- `reportlab>=4.0.0` - PDF creation
 - `jinja2>=3.1.0` - HTML templating
 
-
-## Testing
-
-### Manual Testing Checklist
-```bash
-# 1. Test Genie mode
-streamlit run app.py
-# Select "Genie API", enter Space ID, ask data question
-
-
-### Example Scripts
-```bash
-# Run report generation examples
-python examples/report_example.py
-# Generates: business_report.pdf, business_report.html
-
+### Other
+- `openai>=1.0.0` - OpenAI-compatible client
 
 ## Common Issues
 
 ### Import Errors
-**Problem**: `ModuleNotFoundError: utils.xxx`
-**Solution**: Always run from project root: `streamlit run app.py` (not `python app.py`)
+**Problem**: ModuleNotFoundError
+**Solution**: Run from project root: `streamlit run app.py`
 
-### Genie Conversation Errors
-**Problem**: Genie returns no data or errors
-**Solution**: Check that:
-- Space ID is valid and accessible
-- User has permissions to Genie Space
-- Query matches available data schemas
+### Genie Errors
+**Problem**: No data or API errors
+**Solution**:
+- Verify Space ID
+- Check permissions
+- Confirm query schema match
 
-### PDF Generation Fails
-**Problem**: Image export errors or kaleido issues
-**Solution**: `pip install kaleido==0.2.1` (specific version required)
+### PDF Generation
+**Problem**: Image export errors
+**Solution**: `pip install kaleido==0.2.1`
 
-### Korean Text Broken in PDF
-**Problem**: Korean characters appear as boxes or garbled text
-**Solution**: Ensure macOS system fonts are accessible:
-- AppleSDGothicNeo.ttc at `/System/Library/Fonts/AppleSDGothicNeo.ttc`
-- AppleGothic.ttf at `/System/Library/Fonts/AppleGothic.ttf`
-- ReportLab TTFont registration handles font loading automatically
+### Korean Text
+**Problem**: Broken characters in PDF
+**Solution**:
+- Verify system fonts exist
+- Check `/System/Library/Fonts/`
+- TTFont registration automatic
 
-### Download Buttons Disappear After Click
-**Problem**: After clicking PDF download, HTML download button disappears
-**Solution**: Report data is now persisted in `st.session_state.generated_report`
-- Download buttons remain visible after any download
-- Click "🔄 Generate New Report" to regenerate
+### Download Buttons
+**Problem**: Buttons disappear
+**Solution**:
+- Data persisted in `st.session_state.generated_report`
+- Use "Generate New Report" to regenerate
 
-## File References
+### Loading Video
+**Problem**: Not displaying
+**Solution**:
+- Verify `static/test.mp4` exists
+- Check base64 encoding
+- Confirm container not cleared early
 
-When discussing code locations, use these patterns:
-- `app.py:45` - Chat input handling
-- `ui/sidebar.py:104` - Report generation UI section
-- `utils/genie_helper.py:101` - Response processing logic
-- `utils/llm_helper.py:13` - Multi-provider constructor
-- `utils/report_helper.py:68` - PDF generation method with Korean font support
-- `utils/report_generator.py:15` - Business report generation
-- `utils/map_helper.py:50` - Geometry parsing and map creation
-- `utils/loading_helper.py:10` - Loading video display and removal
-- `core/config.py:31` - Genie Space configuration
-- `core/message_handler.py` - Chat message processing
+## Recent Changes
+
+### Simplified Architecture (2025)
+- **Router removed**: Direct REGION_GENIE queries
+- **Auto map detection**: Checks geometry columns
+- **Mandatory LLM**: All responses analyzed
+- **Code reduction**: ~250 lines removed
+
+**Benefits**:
+- Faster responses
+- Simpler maintenance
+- Enhanced functionality
+- Predictable behavior
+
+### Dynamic Prompt System (2025)
+- Prompt selection by data attributes
+- Multiple template types
+- Automatic grouping by characteristics
+- Merged analysis strategies
+
+### Business Report Generation (2024)
+- LLM-based Korean insights
+- Structured report sections
+- PDF/HTML export
+- Session state persistence
+
+### Polygon Map Visualization (2024)
+- WKT/GeoJSON support
+- Rank-based coloring
+- Interactive popups
+- Automatic detection
+
+### Loading Video Integration (2024)
+- Visual feedback during processing
+- Sequential message display
+- Base64 encoding
+- Automatic cleanup
+
+## Best Practices
+
+### Development Guidelines
+1. Put business logic in helper modules
+2. Update session state immediately
+3. Return success/error dicts
+4. Preserve message structure
+5. Test locally with credentials
+6. Remember single-process constraint
+7. Register Korean fonts for PDFs
+8. Use automatic geometry detection
+9. Stream LLM for UX
+10. Persist state for stability
+
+### Error Handling
+- Wrap API calls in try/except
+- Return dicts with success flag
+- Include error messages
+- Display user-friendly errors
+
+### Testing
+- Use mock mode for UI
+- Configure real credentials for integration
+- Test Korean text rendering
+- Verify full query → analysis flow
 
 ## Documentation
 
-- **User Guide**: `PHASE2_FEATURES.md` - Complete feature documentation
-- **Examples**: `examples/` - Standalone examples for report generatio
-- **README**: Overview and deployment instructions
+- **CLAUDE.md**: This file (developer guidance)
+- **README.md**: Project overview
+- **PHASE2_FEATURES.md**: Feature documentation (if exists)
 
-## Key Learnings for New Features
+## Important Notes
 
-1. **Always use helpers**: Don't put business logic directly in `app.py`
-2. **Preserve message structure**: Include all optional fields (code, chart_data, table_data, domain)
-3. **Handle both success and error cases**: Return `{"success": bool, "content": str, "error": str}`
-4. **Test locally before deploying**: Use mock mode or local credentials
-5. **Remember single-process constraint**: No background workers, no separate API servers
-6. **Session state persistence**: Use `st.session_state` for data that must survive reruns (e.g., generated reports)
-7. **Korean text support**: Register Korean fonts in ReportLab for PDF generation
-8. **Simplified architecture**: Direct REGION_GENIE queries with automatic map detection
-9. **Message structure for reports**: Extract conversation data from `messages` list with proper filtering of queries and data
-10. **LLM Analysis**: All data responses now include mandatory LLM business insights
-
-## UI Components
-
-### Main Components
-- **`ui/sidebar.py`**: Sidebar with chat history, search, and report generation
-- **`ui/chat_display.py`**: Message display with code, tables, and charts
-- **`ui/session.py`**: Session state initialization and management
-- **`ui/styles.py`**: Custom CSS styling
-
-### Core Logic
-- **`core/config.py`**: Databricks client initialization and configuration
-- **`core/message_handler.py`**: Chat input processing and response handling
-
-## Recent Additions
-
-### Business Report Generation (2024)
-- **Purpose**: Generate comprehensive business analysis reports from chat sessions
-- **Implementation**: `utils/report_generator.py` + sidebar UI integration
-- **Features**:
-  - LLM-based business insights in Korean
-  - Structured report with executive summary, analysis, insights, recommendations
-  - PDF/HTML export with Korean font support
-  - Session state persistence for stable download buttons
-- **Known Issues Fixed**:
-  - Korean text encoding in PDF (resolved with TTFont registration)
-  - Download button disappearance (resolved with session state caching)
-
-### Simplified Architecture (2025)
-- **Purpose**: Streamline query processing by removing routing complexity
-- **Implementation**: Direct REGION_GENIE queries with automatic map and LLM analysis
-- **Key Changes**:
-  - **Router removed**: No more multi-domain routing or query analysis phase
-  - **Single Genie**: All queries go directly to REGION_GENIE
-  - **Auto map detection**: Checks for `geometry` column and creates maps automatically
-  - **Mandatory LLM**: All data responses include LLM business insights
-  - **Code reduction**: ~250 lines removed from message_handler.py
-- **Benefits**:
-  - Faster response times (no router LLM call)
-  - Simpler code maintenance
-  - Enhanced functionality (LLM analysis on all responses)
-  - More predictable behavior
-
-### Loading Video Integration (2024)
-- **Purpose**: Provide visual feedback during query processing with looping video
-- **Implementation**: `utils/loading_helper.py` + `core/message_handler.py` integration
-- **Features**:
-  - Displays `static/test.mp4` during async operations
-  - Automatic video removal after query completion or error
-  - Integrated into REGION_GENIE queries
-  - Base64 encoding for reliable video delivery
-  - Configurable width and loop behavior
-- **Usage**: Automatically activated during query processing phases
-
-### Polygon Map Visualization (2024)
-- **Purpose**: Visualize geographic boundary data (polygons) from REGION_GENIE queries
-- **Implementation**: `utils/map_helper.py` polygon map support + automatic geometry detection
-- **Features**:
-  - WKT format support (e.g., `POLYGON((lng lat, ...))`)
-  - GeoJSON format support (e.g., `{"type": "Polygon", "coordinates": [...]}`)
-  - Automatic geometry column detection
-  - Choropleth-style coloring based on numeric values
-  - Interactive popups with region information
-  - Automatic name/value column detection
-  - Seamless integration with existing point map functionality
-- **Usage**: Automatically activated when REGION_GENIE returns data with `geometry` column
-- **Testing**: Run `python test_polygon_map.py` to verify functionality
-- **Technical Details**:
-  - Uses Folium GeoJson for rendering
-  - Shapely for WKT/GeoJSON parsing
-  - GeoPandas for polygon data handling
-  - Priority: Geometry columns → Lat/Lon columns → Other map types
-- 별도의 언급이 없는 이상 추가 md파일을 생성하게 하지마
-- 서버를 재시작하지마 
+- Do not create additional md files and python files unless otherwise stated.
+- Do not restart the server for testing
