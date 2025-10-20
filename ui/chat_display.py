@@ -37,10 +37,16 @@ def display_messages():
                     )
                 else:
                     # Plotly Figure object - use plotly_chart (legacy compatibility)
+                    # Check if figure has custom config (e.g., for interactive maps)
+                    config = getattr(chart_data, '_config', None) or {
+                        'displayModeBar': True,
+                        'displaylogo': False
+                    }
                     st.plotly_chart(
                         chart_data,
                         use_container_width=True,
-                        key=f"chart_{idx}_{msg_hash}"
+                        key=f"chart_{idx}_{msg_hash}",
+                        config=config
                     )
 
             # Display table only if show_table flag is True (conditional display)

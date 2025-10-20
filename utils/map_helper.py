@@ -47,6 +47,15 @@ class MapHelper:
         '#b3b3b3',  # Silver
     ]
 
+    # Rank-based color mapping for polygon maps
+    RANK_COLOR_MAP = {
+        "max": "#296ed4",     # Darkest blue
+        "up": "#d3e7f4",      # Medium blue
+        "min": "#f06305",     # Darkest red
+        "down": "#f7dfd2",    # Medium red
+        "default": "#cccccc"  # Gray for unrecognized values
+    }
+
     def __init__(self):
         """Initialize the MapHelper."""
         pass
@@ -340,11 +349,6 @@ class MapHelper:
         # Create a copy to avoid modifying original data
         df_map = df.copy()
 
-        # Debug: Print original data
-        print(f"\n🔍 CREATE_POINT_MAP - Original data types:")
-        print(f"  - {lat_col} dtype: {df_map[lat_col].dtype}")
-        print(f"  - {lon_col} dtype: {df_map[lon_col].dtype}")
-        print(f"\n📊 Sample original values (first 5):")
         for i in range(min(5, len(df_map))):
             print(f"  Row {i}: lat={df_map[lat_col].iloc[i]}, lon={df_map[lon_col].iloc[i]}")
 
@@ -378,12 +382,6 @@ class MapHelper:
 
         # Use auto zoom if zoom_start is default (10), otherwise respect user's choice
         final_zoom = auto_zoom if zoom_start == 10 else zoom_start
-
-        print(f"\n🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
-        print(f"📏 Coordinate ranges:")
-        print(f"  - Latitude: {lat_min:.6f} to {lat_max:.6f}")
-        print(f"  - Longitude: {lon_min:.6f} to {lon_max:.6f}")
-        print(f"🔍 Auto-calculated zoom: {auto_zoom} (using: {final_zoom})")
 
         # Prepare hover data columns
         hover_data_dict = {}
@@ -439,10 +437,6 @@ class MapHelper:
             # Scale marker sizes between 5 and 20
             fig.update_traces(marker=dict(sizemode='diameter', sizemin=5, sizeref=2))
 
-        print(f"  ✅ Point map created successfully with {len(df_map)} markers")
-        print(f"  🗺️  Map style: {mapbox_style}")
-        print(f"  🎨 Color by: {color_col if color_col else 'None'}")
-        print(f"  📏 Size by: {size_col if size_col else 'None'}")
 
         return fig
 
@@ -512,8 +506,16 @@ class MapHelper:
                     print(f"  🏷️  Auto-detected name column: '{name_col}'")
                     break
 
-        # Auto-detect value column if not specified
-        if not value_col:
+        # Auto-detect rank column (highest priority)
+        rank_col = None
+        rank_keywords = ['rank', 'ranking', '순위', 'RANK']
+        for col in df_map.columns:
+            if col.lower() in rank_keywords or any(keyword in col.lower() for keyword in rank_keywords):
+                rank_col = col
+                break
+
+        # Auto-detect value column if not specified (and no rank column)
+        if not value_col and not rank_col:
             numeric_cols = df_map.select_dtypes(include=['number']).columns.tolist()
             if len(numeric_cols) > 0:
                 value_col = numeric_cols[0]
@@ -534,10 +536,6 @@ class MapHelper:
         # Use auto zoom if zoom_start is default (10), otherwise respect user's choice
         final_zoom = auto_zoom if zoom_start == 10 else zoom_start
 
-        print(f"  🎯 Map center: ({center_lat:.6f}, {center_lon:.6f})")
-        print(f"  📏 Bounds: lat ({lat_min:.6f}, {lat_max:.6f}), lon ({lon_min:.6f}, {lon_max:.6f})")
-        print(f"  🔍 Auto-calculated zoom: {auto_zoom} (using: {final_zoom})")
-
         # Prepare hover data columns
         hover_data_dict = {}
         if popup_cols:
@@ -551,35 +549,109 @@ class MapHelper:
         if value_col and value_col in df_map.columns:
             hover_data_dict[value_col] = True
 
-        # Create choropleth_mapbox figure
-        fig = px.choropleth_mapbox(
-            gdf,
-            geojson=gdf.set_geometry('geometry').__geo_interface__,
-            locations=gdf.index,
-            color=value_col if value_col else None,
-            color_continuous_scale=color_scheme,
-            mapbox_style="carto-positron",
-            center={"lat": center_lat, "lon": center_lon},
-            zoom=final_zoom,
-            opacity=0.7,
-            hover_name=name_col if name_col else None,
-            hover_data=hover_data_dict if hover_data_dict else None
-        )
+        # If rank column exists, use rank-based discrete colors
+        if rank_col:
+            print(f"  🎨 Using rank-based color scheme for '{rank_col}' column")
 
-        # Update layout to prevent clipping and ensure full width
+            # Normalize rank values to lowercase for matching
+            gdf['_color_rank'] = gdf[rank_col].astype(str).str.lower().str.strip()
+
+            # Map each region to its color based on rank
+            # This creates a color map where each region name maps to a color
+            color_discrete_map = {}
+            for idx, row in gdf.iterrows():
+                region_name = row[name_col] if name_col else str(idx)
+                rank_value = row['_color_rank']
+                if rank_value in self.RANK_COLOR_MAP:
+                    color_discrete_map[region_name] = self.RANK_COLOR_MAP[rank_value]
+                else:
+                    color_discrete_map[region_name] = self.RANK_COLOR_MAP["default"]
+
+            # Create a copy for plotting without geometry column to avoid serialization issues
+            gdf_plot = gdf.drop(columns=['geometry'])
+
+            # Create choropleth_mapbox figure with discrete colors
+            # Fixed settings for rank-based maps
+            # Show only penetration rate in hover, hide everything else
+            hover_data_rank = {
+                '1인여성가구_홈보안침투율': True,  # Show only this column
+                '_color_rank': False,  # Hide internal color column
+                'inq': False,  # Hide other columns
+                'rank': False
+            }
+
+            # Also explicitly hide name_col (행정구역) from hover_data
+            if name_col and name_col in gdf_plot.columns:
+                hover_data_rank[name_col] = False
+
+            fig = px.choropleth_mapbox(
+                gdf_plot,
+                geojson=gdf.set_geometry('geometry').__geo_interface__,
+                locations=gdf_plot.index,
+                color=name_col if name_col else gdf_plot.index,  # Color by region name
+                color_discrete_map=color_discrete_map,
+                mapbox_style="carto-positron",
+                center={"lat": 37.55, "lon": 127.0},  # Seoul center
+                zoom=11,  # Fixed zoom level for rank maps
+                opacity=0.8,
+                hover_name='행정구역',  # Don't show any hover_name to avoid duplication
+                hover_data=hover_data_rank
+            )
+        else:
+            # Create choropleth_mapbox figure with continuous color scale (existing logic)
+            fig = px.choropleth_mapbox(
+                gdf,
+                geojson=gdf.set_geometry('geometry').__geo_interface__,
+                locations=gdf.index,
+                color=value_col if value_col else None,
+                color_continuous_scale=color_scheme,
+                mapbox_style="carto-positron",
+                center={"lat": center_lat, "lon": center_lon},
+                zoom=final_zoom,
+                opacity=0.7,
+                hover_name=name_col if name_col else None,
+                hover_data=hover_data_dict if hover_data_dict else None
+            )
+
+        # Update layout to prevent clipping and ensure full width with interactive controls
+        # For rank maps, use fixed center and zoom; otherwise use calculated values
+        map_center = {"lat": 37.55, "lon": 127.0} if rank_col else {"lat": center_lat, "lon": center_lon}
+        map_zoom = 11 if rank_col else final_zoom
+
         fig.update_layout(
             margin={"r":0,"t":0,"l":0,"b":0},
             autosize=True,
             height=600,
             width=None,  # Let Streamlit control the width
             mapbox=dict(
-                center={"lat": center_lat, "lon": center_lon},
-                zoom=final_zoom
+                center=map_center,
+                zoom=map_zoom
             ),
             # Remove any padding that might cause clipping
             paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
+            plot_bgcolor='rgba(0,0,0,0)',
+            # Enable interactive controls
+            dragmode='pan',
+            hovermode='closest'
         )
+
+        # Enable zoom controls and interaction
+        fig.update_traces(
+            marker=dict(opacity=0.9),
+            selector=dict(type='choroplethmapbox')
+        )
+
+        # Configure modebar (toolbar) options for better UX
+        config = {
+            'scrollZoom': True,  # Enable scroll to zoom
+            'displayModeBar': True,  # Show toolbar
+            'displaylogo': False,  # Hide Plotly logo
+            'modeBarButtonsToAdd': ['pan2d', 'zoom2d', 'zoomIn2d', 'zoomOut2d', 'resetScale2d'],
+            'modeBarButtonsToRemove': ['select2d', 'lasso2d']
+        }
+
+        # Store config as attribute for Streamlit to use
+        fig._config = config
 
         print(f"  ✅ Polygon map created successfully with {len(gdf)} regions")
 

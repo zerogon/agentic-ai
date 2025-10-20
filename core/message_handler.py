@@ -263,10 +263,17 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     if map_result:
                                         # It's a Plotly Figure
                                         plotly_fig = map_result
+                                        # Get custom config if available (for interactive maps)
+                                        config = getattr(plotly_fig, '_config', None) or {
+                                            'responsive': True,
+                                            'displayModeBar': True,
+                                            'displaylogo': False,
+                                            'scrollZoom': True
+                                        }
                                         st.plotly_chart(
                                             plotly_fig,
                                             use_container_width=True,
-                                            config={'responsive': True, 'displayModeBar': False}
+                                            config=config
                                         )
                                     else:
                                         # Fallback to bar chart if map fails
@@ -277,7 +284,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                             dark_mode=True
                                         )
                                         if plotly_fig:
-                                            st.plotly_chart(plotly_fig, use_container_width=True)
+                                            config = getattr(plotly_fig, '_config', None) or {
+                                                'displayModeBar': True,
+                                                'displaylogo': False
+                                            }
+                                            st.plotly_chart(plotly_fig, use_container_width=True, config=config)
                                 else:
                                     # Create Plotly chart for non-map visualizations
                                     plotly_fig = data_helper.create_chart(
@@ -288,7 +299,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                     )
 
                                     if plotly_fig:
-                                        st.plotly_chart(plotly_fig, use_container_width=True)
+                                        config = getattr(plotly_fig, '_config', None) or {
+                                            'displayModeBar': True,
+                                            'displaylogo': False
+                                        }
+                                        st.plotly_chart(plotly_fig, use_container_width=True, config=config)
 
                                 # Show data table (skip for maps)
                                 is_map_chart = selected_chart == "map" and plotly_fig is not None
@@ -424,7 +439,11 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                 )
 
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True)
+                    config = getattr(fig, '_config', None) or {
+                        'displayModeBar': True,
+                        'displaylogo': False
+                    }
+                    st.plotly_chart(fig, use_container_width=True, config=config)
 
                 st.markdown("**📋 Sample Data:**")
                 st.dataframe(sample_data, use_container_width=True)

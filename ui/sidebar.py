@@ -124,12 +124,12 @@ def render_sidebar():
         st.markdown('<div class="sidebar-section-spacing"></div>', unsafe_allow_html=True)
 
         # Report Generation Section
-        if total_messages > 0:
-            st.markdown('<div class="section-title">📊 Reports</div>', unsafe_allow_html=True)
+        #if total_messages > 0:
+            # st.markdown('<div class="section-title">📊 Reports</div>', unsafe_allow_html=True)
 
             # Generate report preview
-            messages = st.session_state.get("messages", [])
-            preview = generate_report_preview(messages)
+            #messages = st.session_state.get("messages", [])
+            #preview = generate_report_preview(messages)
 
             # Show report stats
             # if preview["total_queries"] > 0:
