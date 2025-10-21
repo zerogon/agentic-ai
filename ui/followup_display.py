@@ -34,7 +34,7 @@ def display_followup_questions(
 
     # Display header
     render_container.markdown("---")
-    render_container.markdown("### 💬 관련 질문을 더 해보세요")
+    render_container.markdown("### 💬 Ask more related questions")
 
     # Create columns for buttons (max 3 buttons in one row)
     num_questions = min(len(questions), 3)
@@ -46,16 +46,18 @@ def display_followup_questions(
             # Create unique key for button
             button_key = f"followup_btn_{hash(question)}_{idx}"
 
+            # Define click handler as callback
+            def set_pending_prompt(q=question):
+                st.session_state.pending_prompt = q
+
             # Render button with question text
-            if st.button(
+            st.button(
                 f"❓ {question}",
                 key=button_key,
                 use_container_width=True,
-                type="secondary"
-            ):
-                # Handle click: Store selected question in session state
-                st.session_state.pending_prompt = question
-                st.rerun()
+                type="secondary",
+                on_click=set_pending_prompt
+            )
 
 
 def display_followup_questions_inline(questions: List[str], message_index: int) -> None:
@@ -93,16 +95,18 @@ def display_followup_questions_inline(questions: List[str], message_index: int) 
             # Create unique key using message index
             button_key = f"history_followup_{message_index}_{idx}"
 
+            # Define click handler as callback
+            def set_pending_prompt(q=question):
+                st.session_state.pending_prompt = q
+
             # Render button
-            if st.button(
+            st.button(
                 f"❓ {question}",
                 key=button_key,
                 use_container_width=True,
-                type="secondary"
-            ):
-                # Handle click: Store selected question
-                st.session_state.pending_prompt = question
-                st.rerun()
+                type="secondary",
+                on_click=set_pending_prompt
+            )
 
 
 def get_followup_button_style() -> str:

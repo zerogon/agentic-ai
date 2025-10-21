@@ -49,9 +49,9 @@ class MapHelper:
 
     # Rank-based color mapping for polygon maps
     RANK_COLOR_MAP = {
-        "max": "#296ed4",     # Darkest blue
+        "max": "#d3e7f4",     # Darkest blue
         "up": "#d3e7f4",      # Medium blue
-        "min": "#f06305",     # Darkest red
+        "min": "#f7dfd2",     # Darkest red
         "down": "#f7dfd2",    # Medium red
         "default": "#cccccc"  # Gray for unrecognized values
     }
