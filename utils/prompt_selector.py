@@ -194,9 +194,7 @@ def merge_analysis_results(results: dict) -> dict:
 
         if content:
             # Add header for each inq section
-            inq_label = inq_value.upper() if inq_value != "default" else "General"
-            section_header = f"### 📊 {inq_label} Analysis\n\n"
-            merged_content_parts.append(section_header + content)
+            merged_content_parts.append(content)
 
     # Join with separator
     merged_content = "\n\n---\n\n".join(merged_content_parts)
