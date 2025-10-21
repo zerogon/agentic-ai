@@ -55,10 +55,10 @@ DARK_THEME = {
     "primary_button_hover_shadow": "0 4px 16px rgba(59, 130, 246, 0.2)",
 
     # Inputs
-    "input_background": "rgba(32, 35, 42, 0.5)",
+    "input_background": "rgba(32, 35, 42, 1.0)",
     "input_border": "rgba(64, 68, 78, 0.3)",
     "input_focus_border": "rgba(91, 143, 212, 0.5)",
-    "input_focus_background": "rgba(32, 35, 42, 0.7)",
+    "input_focus_background": "rgba(32, 35, 42, 1.0)",
     "input_focus_shadow": "0 0 0 3px rgba(59, 130, 246, 0.15)",
 
     # Message previews

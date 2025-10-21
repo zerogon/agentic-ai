@@ -518,7 +518,7 @@ def apply_custom_styles():
 
     /* Chat input container styling */
     [data-testid="stChatInputContainer"] {{
-        background: transparent !important;
+        background: {theme["app_background"]} !important;
         border: none !important;
         border-radius: 0.75rem !important;
         padding: 0 !important;
@@ -526,7 +526,7 @@ def apply_custom_styles():
 
     /* Chat input wrapper */
     [data-testid="stChatInput"] {{
-        background: transparent !important;
+        background: {theme["app_background"]} !important;
         padding: 0 !important;
     }}
 
@@ -586,6 +586,58 @@ def apply_custom_styles():
     /* Caption and helper text */
     .stCaption {{
         color: {theme["muted_text"]} !important;
+    }}
+
+    /* Disable ALL Streamlit blur effects during loading */
+
+    /* Prevent spinner from blurring content */
+    [data-testid="stSpinner"] ~ div,
+    [data-testid="stSpinner"] ~ [data-testid="stVerticalBlock"],
+    .stSpinner ~ div,
+    .element-container:has([data-testid="stSpinner"]) ~ div {{
+        filter: none !important;
+        opacity: 1 !important;
+    }}
+
+    /* Override default spinner background blur */
+    [data-testid="stSpinner"]::before,
+    [data-testid="stSpinner"]::after {{
+        backdrop-filter: none !important;
+        filter: none !important;
+    }}
+
+    /* Ensure chat messages remain clear during any loading state */
+    .stChatMessage,
+    [data-testid="stChatMessage"],
+    .stChatMessage *,
+    [data-testid="stChatMessage"] * {{
+        filter: none !important;
+        opacity: 1 !important;
+        backdrop-filter: none !important;
+    }}
+
+    /* Prevent main content area blur during loading */
+    .main .block-container,
+    [data-testid="stMainBlockContainer"],
+    [data-testid="stVerticalBlock"] {{
+        filter: none !important;
+        opacity: 1 !important;
+    }}
+
+    /* Override Streamlit's default loading overlay blur */
+    .stApp > div,
+    .stApp [data-testid="stVerticalBlock"] > div {{
+        filter: none !important;
+        opacity: 1 !important;
+    }}
+
+    /* Specifically target elements that might get blurred during rerun */
+    [data-stale="true"],
+    [data-stale="true"] *,
+    .element-container,
+    .element-container * {{
+        filter: none !important;
+        opacity: 1 !important;
     }}
     </style>
 """, unsafe_allow_html=True)
