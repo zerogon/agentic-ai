@@ -1,4 +1,5 @@
 import streamlit as st
+from ui.followup_display import display_followup_questions_inline
 
 
 def display_messages():
@@ -57,3 +58,9 @@ def display_messages():
                     use_container_width=True,
                     key=f"table_{idx}_{msg_hash}"
                 )
+
+            # Display follow-up questions if present (for LLM analysis messages)
+            if "followup_questions" in message and message.get("followup_questions"):
+                followup_questions = message["followup_questions"]
+                if followup_questions and len(followup_questions) >= 3:
+                    display_followup_questions_inline(followup_questions, idx)

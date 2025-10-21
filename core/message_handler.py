@@ -6,7 +6,9 @@ from utils.genie_helper import GenieHelper
 from utils.data_helper import DataHelper
 from utils.llm_helper import LLMHelper
 from utils.loading_helper import display_loading_video, remove_loading_video, update_loading_message, display_loading_with_sequential_messages, update_to_next_message
+from utils.followup_helper import FollowupHelper
 from ui.session import update_current_session_messages
+from ui.followup_display import display_followup_questions
 from core.config import get_space_id_by_domain
 from prompts.manager import load_prompt
 
@@ -376,15 +378,34 @@ def handle_chat_input(w: WorkspaceClient, config: dict):
                                 )
 
                         if llm_result["success"]:
-                            insight_text = llm_result["content"]
-                            # Add LLM insight to chat history
+                            full_llm_response = llm_result["content"]
+
+                            # Initialize followup helper
+                            followup_helper = FollowupHelper()
+
+                            # Extract analysis without questions section
+                            analysis_only = followup_helper.extract_analysis_without_questions(full_llm_response)
+
+                            # Get followup questions (hardcoded override if available)
+                            followup_questions = followup_helper.get_followup_questions(
+                                user_query=prompt,
+                                llm_response=full_llm_response,
+                                prefer_hardcoded=True
+                            )
+
+                            # Add LLM insight to chat history (without questions section)
                             st.session_state.messages.append({
                                 "role": "assistant",
-                                "content": f"💡 **LLM Analysis**\n\n{insight_text}",
-                                "is_llm_analysis": True  # Flag to distinguish from Genie responses
+                                "content": f"💡 **LLM Analysis**\n\n{analysis_only}",
+                                "is_llm_analysis": True,  # Flag to distinguish from Genie responses
+                                "followup_questions": followup_questions  # Store questions for rendering
                             })
                             # Immediately sync after adding LLM insight
                             update_current_session_messages()
+
+                            # Display followup questions
+                            if followup_questions and len(followup_questions) >= 3:
+                                display_followup_questions(followup_questions)
                         else:
                             error_msg = f"❌ LLM Analysis Error: {llm_result.get('error', 'Unknown error')}"
                             st.error(error_msg)
